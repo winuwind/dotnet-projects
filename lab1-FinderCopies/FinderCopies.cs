@@ -1,4 +1,4 @@
-﻿namespace FinderCopies;
+namespace FinderCopies;
 
 using System.Net;
 using System.Net.Sockets;
@@ -14,7 +14,7 @@ public class FinderCopies
     private AddressFamily _family = AddressFamily.InterNetwork;
     
     private readonly ConcurrentDictionary<string, (string ip, DateTime lastSeen)> _peers = new ConcurrentDictionary<string, (string ip, DateTime lastSeen)>();
-    private readonly UdpClient _recvClient = new UdpClient();
+    private UdpClient _recvClient;
     private UdpClient _sendClient = new UdpClient();
 
     private readonly string _instanceId = Guid.NewGuid().ToString();
@@ -35,6 +35,8 @@ public class FinderCopies
 
     private void CreateRecvClient()
     {
+        _recvClient = new UdpClient(_family);
+
         _recvClient.Client.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, true);
         _recvClient.Client.Bind(new IPEndPoint(_isIPv6 ? IPAddress.IPv6Any : IPAddress.Any, _port));
 
