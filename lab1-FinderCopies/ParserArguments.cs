@@ -2,10 +2,13 @@
 
 public class ParserArguments
 {
+    private const string Ip = "239.255.0.1";
+    private const int Port = 25565;
+    
     public static (string, int) Parse(string[] args)
     {
-        var ip = "239.255.0.1";
-        var port = 25565;
+        var ip = Ip;
+        var port = Port;
         for (var i = 0; i < args.Length; i++)
         {
             var arg = args[i];

@@ -1,4 +1,4 @@
-namespace FinderCopies;
+﻿namespace FinderCopies;
 
 using System.Net;
 using System.Net.Sockets;
@@ -11,19 +11,18 @@ public class FinderCopies
     private const double Timeout = 5;
     private const double DelayDisplayTable = 3;
     
-    private AddressFamily _family = AddressFamily.InterNetwork;
-    
     private readonly ConcurrentDictionary<string, (string ip, DateTime lastSeen)> _peers = new ConcurrentDictionary<string, (string ip, DateTime lastSeen)>();
-    private UdpClient _recvClient;
-    private UdpClient _sendClient = new UdpClient();
-
     private readonly string _instanceId = Guid.NewGuid().ToString();
-
-    private static string _multicastGroupAddr = "239.255.0.1";
-    private static int _port = 25565;
+    private readonly string _multicastGroupAddr;
+    private readonly int _port;
+    
     private static bool _isIPv6;
     private static volatile bool _running = true;
 
+    private AddressFamily _family = AddressFamily.InterNetwork;
+    private UdpClient? _recvClient;
+    private UdpClient _sendClient = new UdpClient();
+    
     private record Heartbeat(string AppName, string InstanceId);
     
     public FinderCopies(string ip, int port)
@@ -106,7 +105,7 @@ public class FinderCopies
             try
             {
                 var remoteEp = new IPEndPoint(IPAddress.Any, 0);
-                var res =  _recvClient.Receive(ref remoteEp);
+                var res =  _recvClient?.Receive(ref remoteEp);
                 var sourceIp = remoteEp.Address.ToString();
                 try
                 {
@@ -186,8 +185,8 @@ public class FinderCopies
         
         senderThread.Join();
 
-        _recvClient.DropMulticastGroup(IPAddress.Parse(_multicastGroupAddr));
-        _recvClient.Close();
+        _recvClient?.DropMulticastGroup(IPAddress.Parse(_multicastGroupAddr));
+        _recvClient?.Close();
         _sendClient.Close();
     }
 }
