@@ -111,7 +111,7 @@ public class TransferData(ClientHandler handler, Server server) : ITransfer
 
     private void PrintSpeed(DateTime startTime, DateTime lastTime, DateTime now, long countLast, long countAll)
     {
-        var speed = countLast / now.Subtract(lastTime).TotalSeconds;
+        var speed = countLast * MaxSizeData / now.Subtract(lastTime).TotalSeconds;
         
         var sb = new StringBuilder();
         sb.AppendFormat($"File: {_fileName}: Loading speed: ");
@@ -132,7 +132,7 @@ public class TransferData(ClientHandler handler, Server server) : ITransfer
         {
             sb.AppendFormat($"{(speed * GigaR):0.00} GB/s\n");
         }
-        var avgSpeed = countAll / now.Subtract(startTime).TotalSeconds;
+        var avgSpeed = countAll * MaxSizeData / now.Subtract(startTime).TotalSeconds;
         sb.AppendFormat("Average loading speed: ");
         if (avgSpeed < Kilo)
         {
