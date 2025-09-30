@@ -53,7 +53,7 @@ dotnet run -- -a ff02::1 -p 25565
 ### Запуск из собранной DLL
 
 ```bash
-dotnet bin/Debug/net8.0/FinderCopies.dll -a 239.255.0.1 -p 25565
+dotnet bin/Debug/net8.0/lab1_FinderCopies.dll -a 239.255.0.1 -p 25565
 ```
 
 ---
@@ -63,8 +63,8 @@ dotnet bin/Debug/net8.0/FinderCopies.dll -a 239.255.0.1 -p 25565
 1. Клонировать репозиторий:
 
    ```bash
-   git clone https://github.com/<23210-NetworkTechnologies>/FinderCopies.git
-   cd FinderCopies
+   git clone https://github.com/<23210-NetworkTechnologies>/lab1_FinderCopies.git
+   cd lab1_FinderCopies
    ```
 
 2. Собрать проект:
