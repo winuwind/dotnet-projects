@@ -1,4 +1,4 @@
-﻿namespace ProtocolLibrary.Protocol;
+﻿namespace Protocol.Protocol;
 
 using Segments;
 

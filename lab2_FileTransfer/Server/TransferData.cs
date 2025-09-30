@@ -1,20 +1,14 @@
-﻿namespace Server;
+﻿using Protocol.Constants;
+using Protocol.Printer;
+
+namespace Server;
 
 using System.Text;
-using ProtocolLibrary.Protocol;
-using ProtocolLibrary.Protocol.Segments;
+using Protocol.Protocol;
+using Protocol.Protocol.Segments;
 
 public class TransferData(ClientHandler handler, Server server) : ITransfer
 {
-    private const double Kilo = 1024.0;
-    private const double Mega = 1024.0 * 1024.0;
-    private const double Giga = 1024.0 * 1024.0 * 1024.0;
-    private const double Tera = 1024.0 * 1024.0 * 1024.0 * 1024.0;
-    private const double KiloR = 1.0 / Kilo;
-    private const double MegaR = 1.0 / Mega;
-    private const double GigaR = 1.0 / Giga;
-    private const int MaxSizeData = 4096;
-
     private readonly Server? _server = server;
 
     private static long _segmentId = 1;
@@ -31,32 +25,6 @@ public class TransferData(ClientHandler handler, Server server) : ITransfer
     private long _countSegmentsInLastTime;
     private int _cursorLeft;
     private int _cursorTop;
-    
-    private void SendSegment(Segment segment)
-    {
-        handler.Send(ITransfer.Serialize(segment));
-    }
-
-    private static Segment GenerateSegment(long numberOfSegment)
-    {
-        var segmentData = new SegmentData
-        {
-            Size = 0,
-            NumberOfSegment = numberOfSegment,
-            Data = null
-        };
-
-        var segment = new Segment
-        {
-            SegmentSize = segmentData.Size + 40,
-            SegmentId = _segmentId,
-            TypeSegment = TypeSegment.Fail,
-            SegmentData = segmentData
-        };
-
-        _segmentId += 2;
-        return segment;
-    }
 
     public int AskSegments()
     {
@@ -99,7 +67,7 @@ public class TransferData(ClientHandler handler, Server server) : ITransfer
 
         var segment = new Segment
         {
-            SegmentSize = segmentData.Size + 40,
+            SegmentSize = segmentData.Size + AppConstants.HeaderLenght,
             SegmentId = _segmentId,
             TypeSegment = TypeSegment.Exit,
             SegmentData = segmentData
@@ -107,50 +75,6 @@ public class TransferData(ClientHandler handler, Server server) : ITransfer
 
         _segmentId += 2;
         return segment;
-    }
-
-    private void PrintSpeed(DateTime startTime, DateTime lastTime, DateTime now, long countLast, long countAll)
-    {
-        var speed = countLast * MaxSizeData / now.Subtract(lastTime).TotalSeconds;
-        
-        var sb = new StringBuilder();
-        sb.AppendFormat($"File: {_fileName}: Loading speed: ");
-        
-        if (speed < Kilo)
-        {
-            sb.AppendFormat($"{speed:0.00} B/s\n");
-        }
-        else if (speed < Mega)
-        {
-            sb.AppendFormat($"{(speed * KiloR):0.00} KB/s\n");
-        }
-        else if (speed < Giga)
-        {
-            sb.AppendFormat($"{(speed * MegaR):0.00} MB/s\n");
-        }
-        else if (speed < Tera)
-        {
-            sb.AppendFormat($"{(speed * GigaR):0.00} GB/s\n");
-        }
-        var avgSpeed = countAll * MaxSizeData / now.Subtract(startTime).TotalSeconds;
-        sb.AppendFormat("Average loading speed: ");
-        if (avgSpeed < Kilo)
-        {
-            sb.AppendFormat($"{avgSpeed:0.00} B/s\n");
-        }
-        else if (avgSpeed < Mega)
-        {
-            sb.AppendFormat($"{(avgSpeed * KiloR):0.00} KB/s\n");
-        }
-        else if (avgSpeed < Giga)
-        {
-            sb.AppendFormat($"{(avgSpeed * MegaR):0.00} MB/s\n");
-        }
-        else if (avgSpeed < Tera)
-        {
-            sb.AppendFormat($"{(avgSpeed * GigaR):0.00} GB/s\n");
-        }
-        Server.Print(sb.ToString(), _cursorLeft, _cursorTop);
     }
 
     public void ReceiveSegment(byte[] bytes, long size, int id)
@@ -169,7 +93,7 @@ public class TransferData(ClientHandler handler, Server server) : ITransfer
 
         if (segment.TypeSegment == TypeSegment.Cancel)
         {
-            Server.Print("Transfer of file cancelled", -1, -1);
+            Printer.Print("Transfer of file cancelled", -1, -1);
             
             _isCanceled = true;
             
@@ -200,7 +124,7 @@ public class TransferData(ClientHandler handler, Server server) : ITransfer
             if (segment.SegmentData.Data != null)
                 _server?.SetPartFile(segment.SegmentData.Data, segment.SegmentData.Size,
                     segment.SegmentData.NumberOfSegment,
-                    MaxSizeData, id);
+                    AppConstants.MaxSizeData, id);
 
             _countSegmentsInLastTime++;
             _numberReceivedSegments++;
@@ -224,13 +148,13 @@ public class TransferData(ClientHandler handler, Server server) : ITransfer
                 return;
             }
             
-            Server.Print("Transfer of file started", -1, -1);
+            Printer.Print("Transfer of file started", -1, -1);
             (_cursorLeft, _cursorTop) = Console.GetCursorPosition();
-            Server.Print("", -1, -1);
-            Server.Print("", -1, -1);
-            Server.Print("", -1, -1);
+            Printer.Print("", -1, -1);
+            Printer.Print("", -1, -1);
+            Printer.Print("", -1, -1);
             
-            _receivedParts = new bool[(segment.SegmentData.Size + MaxSizeData - 1) / MaxSizeData];
+            _receivedParts = new bool[(segment.SegmentData.Size + AppConstants.MaxSizeData - 1) / AppConstants.MaxSizeData];
             for (var i = 0; i < _receivedParts.Length; i++)
             {
                 _receivedParts[i] = false;
@@ -260,5 +184,75 @@ public class TransferData(ClientHandler handler, Server server) : ITransfer
             });
             _thread.Start();
         }
+    }
+    
+    private void SendSegment(Segment segment)
+    {
+        handler.Send(ITransfer.Serialize(segment));
+    }
+
+    private static Segment GenerateSegment(long numberOfSegment)
+    {
+        var segmentData = new SegmentData
+        {
+            Size = 0,
+            NumberOfSegment = numberOfSegment,
+            Data = null
+        };
+
+        var segment = new Segment
+        {
+            SegmentSize = segmentData.Size + AppConstants.HeaderLenght,
+            SegmentId = _segmentId,
+            TypeSegment = TypeSegment.Fail,
+            SegmentData = segmentData
+        };
+
+        _segmentId += 2;
+        return segment;
+    }
+
+    private void PrintSpeed(DateTime startTime, DateTime lastTime, DateTime now, long countLast, long countAll)
+    {
+        var speed = countLast * AppConstants.MaxSizeData / now.Subtract(lastTime).TotalSeconds;
+        
+        var sb = new StringBuilder();
+        sb.AppendFormat($"File: {_fileName}: Loading speed: ");
+        
+        if (speed < AppConstants.Kilo)
+        {
+            sb.AppendFormat($"{speed:0.00} B/s\n");
+        }
+        else if (speed < AppConstants.Mega)
+        {
+            sb.AppendFormat($"{(speed * AppConstants.KiloR):0.00} KB/s\n");
+        }
+        else if (speed < AppConstants.Giga)
+        {
+            sb.AppendFormat($"{(speed * AppConstants.MegaR):0.00} MB/s\n");
+        }
+        else if (speed < AppConstants.Tera)
+        {
+            sb.AppendFormat($"{(speed * AppConstants.GigaR):0.00} GB/s\n");
+        }
+        var avgSpeed = countAll * AppConstants.MaxSizeData / now.Subtract(startTime).TotalSeconds;
+        sb.AppendFormat("Average loading speed: ");
+        if (avgSpeed < AppConstants.Kilo)
+        {
+            sb.AppendFormat($"{avgSpeed:0.00} B/s\n");
+        }
+        else if (avgSpeed < AppConstants.Mega)
+        {
+            sb.AppendFormat($"{(avgSpeed * AppConstants.KiloR):0.00} KB/s\n");
+        }
+        else if (avgSpeed < AppConstants.Giga)
+        {
+            sb.AppendFormat($"{(avgSpeed * AppConstants.MegaR):0.00} MB/s\n");
+        }
+        else if (avgSpeed < AppConstants.Tera)
+        {
+            sb.AppendFormat($"{(avgSpeed * AppConstants.GigaR):0.00} GB/s\n");
+        }
+        Printer.Print(sb.ToString(), _cursorLeft, _cursorTop);
     }
 }

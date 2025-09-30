@@ -1,12 +1,11 @@
 ﻿using System.Net;
 using System.Net.Sockets;
+using Protocol.Constants;
 
 namespace Client;
 
 public class Client
 {
-    private const long Terabyte = 1024L * 1024L * 1024L * 1024L;
-    
     private readonly TcpClient _client;
     private readonly ServerHandler _serverHandler;
     private readonly Thread _thread;
@@ -14,6 +13,43 @@ public class Client
     private static bool _running = true;
     
     private TransferData? _transferData;
+
+    public static void Start(string[] args)
+    {
+        Console.Clear();
+        
+        var (port, ip, dns) = ParseArgs(args);
+
+        Client client;
+        if(ip != null)
+        {
+            client = new Client(ip, port);
+        }
+        else
+        {
+            client = new Client(dns, port);
+        }
+        
+        _running = true;
+
+        Console.CancelKeyPress += (_, e) =>
+        {
+            e.Cancel = true;
+            _running = false;
+            client.Exit();
+        };
+        
+        ReadCommands(client);
+    }
+
+    public void Exit()
+    {
+        _running = false;
+        _serverHandler.Close();
+        _client.Close();
+        _thread.Join();
+        Environment.Exit(0);
+    }
 
     private Client(IPAddress ip, int port)
     {
@@ -43,7 +79,7 @@ public class Client
             return;
         }
         var fileInfo = new FileInfo(filepath);
-        if (fileInfo.Name.Length > 4096 || fileInfo.Length > Terabyte)
+        if (fileInfo.Name.Length > AppConstants.MaxLenghtName || fileInfo.Length > AppConstants.Terabyte)
         {
             Console.WriteLine($"File {filepath} does not supported");
             return;
@@ -57,15 +93,6 @@ public class Client
     private void Cancel()
     {
         _transferData?.Cancel();
-    }
-
-    public void Exit()
-    {
-        _running = false;
-        _serverHandler.Close();
-        _client.Close();
-        _thread.Join();
-        Environment.Exit(0);
     }
     
     private static void PrintUsage()
@@ -145,25 +172,4 @@ public class Client
             }
         }
     }
-
-    public static void Main(string[] args)
-    {
-        Console.Clear();
-        
-        var (port, ip, dns) = ParseArgs(args);
-
-        var client = ip != null ? new Client(ip, port) : new Client(dns, port);
-        
-        _running = true;
-
-        Console.CancelKeyPress += (_, e) =>
-        {
-            e.Cancel = true;
-            _running = false;
-            client.Exit();
-        };
-        
-        ReadCommands(client);
-    }
-    
 }

@@ -1,4 +1,4 @@
-﻿namespace ProtocolLibrary.Handler;
+﻿namespace Protocol.Handler;
 
 using Protocol;
 

@@ -1,13 +1,13 @@
-﻿namespace Client;
+﻿using Protocol.Constants;
+
+namespace Client;
 
 using System.Text;
-using ProtocolLibrary.Protocol;
-using ProtocolLibrary.Protocol.Segments;
+using Protocol.Protocol;
+using Protocol.Protocol.Segments;
 
 public class TransferData : ITransfer
 {
-    private const int MaxSizeData = 4096;
-    
     private readonly Client _client;
     private readonly ServerHandler _handler;
     private readonly string _filePath;
@@ -41,33 +41,6 @@ public class TransferData : ITransfer
     
     public int AskSegments(){return 0;}
 
-    private void SendSegment(Segment segment)
-    {
-        _handler.Send(ITransfer.Serialize(segment));
-    }
-
-    private void SendFileInfo()
-    {
-        var segmentData = new SegmentData
-        {
-            Size = _sizeFile,
-            NumberOfSegment = _numberSegment,
-            Data = Encoding.UTF8.GetBytes(_fileName)
-        };
-
-        var segment = new Segment
-        {
-            SegmentSize = segmentData.Data.Length + 40,
-            SegmentId = _segmentId,
-            TypeSegment = TypeSegment.Name,
-            SegmentData = segmentData
-        };
-
-
-        _segmentId += 2;
-        SendSegment(segment);
-    }
-
     public void SendFile()
     {
         _thread = new Thread(_ =>
@@ -87,7 +60,7 @@ public class TransferData : ITransfer
         }
 
         using var fs = File.OpenRead(_filePath);
-        var buffer = new byte[MaxSizeData];
+        var buffer = new byte[AppConstants.MaxSizeData];
         int bytesRead;
         while ((bytesRead = fs.Read(buffer, 0, buffer.Length)) > 0 && !_isCanceled)
         {
@@ -103,7 +76,7 @@ public class TransferData : ITransfer
 
             var segment = new Segment
             {
-                SegmentSize = segmentData.Size + 40,
+                SegmentSize = segmentData.Size + AppConstants.HeaderLenght,
                 SegmentId = _segmentId,
                 TypeSegment = TypeSegment.Data,
                 SegmentData = segmentData
@@ -127,7 +100,7 @@ public class TransferData : ITransfer
 
         var segment = new Segment
         {
-            SegmentSize = 40,
+            SegmentSize = AppConstants.HeaderLenght,
             SegmentId = _segmentId,
             TypeSegment = TypeSegment.Cancel,
             SegmentData = segmentData
@@ -135,35 +108,6 @@ public class TransferData : ITransfer
 
         _segmentId += 2;
         SendSegment(segment);
-    }
-    private Segment GenerateSegment(long numberOfSegment)
-    {
-        using var fs = new FileStream(_filePath, FileMode.Open, FileAccess.Read);
-        fs.Seek(numberOfSegment * MaxSizeData, SeekOrigin.Begin);
-
-        var buffer = new byte[MaxSizeData];
-        var bytesRead = fs.Read(buffer, 0, buffer.Length);
-
-        var part = new byte[bytesRead];
-        Array.Copy(buffer, part, bytesRead);
-            
-        var segmentData = new SegmentData
-        {
-            Size = bytesRead,
-            NumberOfSegment = numberOfSegment,
-            Data = part
-        };
-
-        var segment = new Segment
-        {
-            SegmentSize = segmentData.Size + 40,
-            SegmentId = _segmentId,
-            TypeSegment = TypeSegment.Data,
-            SegmentData = segmentData
-        };
-
-        _segmentId += 2;
-        return segment;
     }
 
     public Segment ExitSegment()
@@ -176,7 +120,7 @@ public class TransferData : ITransfer
 
         var segment = new Segment
         {
-            SegmentSize = segmentData.Size + 40,
+            SegmentSize = segmentData.Size + AppConstants.HeaderLenght,
             SegmentId = _segmentId,
             TypeSegment = TypeSegment.Exit,
             SegmentData = segmentData
@@ -220,5 +164,62 @@ public class TransferData : ITransfer
                 Evt.Set();
                 break;
         }
+    }
+
+    private void SendSegment(Segment segment)
+    {
+        _handler.Send(ITransfer.Serialize(segment));
+    }
+
+    private void SendFileInfo()
+    {
+        var segmentData = new SegmentData
+        {
+            Size = _sizeFile,
+            NumberOfSegment = _numberSegment,
+            Data = Encoding.UTF8.GetBytes(_fileName)
+        };
+
+        var segment = new Segment
+        {
+            SegmentSize = segmentData.Data.Length + AppConstants.HeaderLenght,
+            SegmentId = _segmentId,
+            TypeSegment = TypeSegment.Name,
+            SegmentData = segmentData
+        };
+
+
+        _segmentId += 2;
+        SendSegment(segment);
+    }
+    
+    private Segment GenerateSegment(long numberOfSegment)
+    {
+        using var fs = new FileStream(_filePath, FileMode.Open, FileAccess.Read);
+        fs.Seek(numberOfSegment * AppConstants.MaxSizeData, SeekOrigin.Begin);
+
+        var buffer = new byte[AppConstants.MaxSizeData];
+        var bytesRead = fs.Read(buffer, 0, buffer.Length);
+
+        var part = new byte[bytesRead];
+        Array.Copy(buffer, part, bytesRead);
+            
+        var segmentData = new SegmentData
+        {
+            Size = bytesRead,
+            NumberOfSegment = numberOfSegment,
+            Data = part
+        };
+
+        var segment = new Segment
+        {
+            SegmentSize = segmentData.Size + AppConstants.HeaderLenght,
+            SegmentId = _segmentId,
+            TypeSegment = TypeSegment.Data,
+            SegmentData = segmentData
+        };
+
+        _segmentId += 2;
+        return segment;
     }
 }

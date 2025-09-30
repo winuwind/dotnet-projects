@@ -1,4 +1,4 @@
-﻿namespace ProtocolLibrary.Handler;
+﻿namespace Protocol.Handler;
 
 using System.Net.Sockets;
 using Protocol;
@@ -11,8 +11,7 @@ public abstract class AbstractHandler : IHandler
     protected ITransfer? TransferData;
     protected bool IsRunning;
     protected int Id;
-
-
+    
     public void SetTransferData(ITransfer transferData)
     {
         TransferData = transferData;
@@ -30,20 +29,6 @@ public abstract class AbstractHandler : IHandler
                 }
             }
         });
-    }
-    
-    private void ReadExact(byte[] buffer, int offset, int count)
-    {
-        int totalRead = 0;
-        while (totalRead < count)
-        {
-            var bytesRead = Stream.Read(buffer, offset + totalRead, count - totalRead);
-            if (bytesRead == 0)
-            {
-                throw new IOException("Closed connection");
-            }
-            totalRead += bytesRead;
-        }
     }
 
     public void Receive()
@@ -67,7 +52,6 @@ public abstract class AbstractHandler : IHandler
         }
         catch (Exception)
         {
-            // Console.WriteLine("Connection closed");
             IsRunning = false;
         }
     }
@@ -94,5 +78,19 @@ public abstract class AbstractHandler : IHandler
         }
 
         Stream.Close();
+    }
+    
+    private void ReadExact(byte[] buffer, int offset, int count)
+    {
+        var totalRead = 0;
+        while (totalRead < count)
+        {
+            var bytesRead = Stream.Read(buffer, offset + totalRead, count - totalRead);
+            if (bytesRead == 0)
+            {
+                throw new IOException("Closed connection");
+            }
+            totalRead += bytesRead;
+        }
     }
 }

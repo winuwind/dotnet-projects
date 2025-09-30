@@ -1,4 +1,4 @@
-﻿namespace ProtocolLibrary.Protocol.Segments;
+﻿namespace Protocol.Protocol.Segments;
 
 public enum TypeSegment
 {

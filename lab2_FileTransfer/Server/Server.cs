@@ -1,4 +1,6 @@
 ﻿using System.Text;
+using Protocol.Constants;
+using Protocol.Printer;
 
 namespace Server;
 
@@ -15,14 +17,119 @@ public class Server
     private readonly int _port;
     
     private static readonly Dictionary<int, object> FileStreamsSync = new Dictionary<int, object>();
-    
-    private static readonly Lock SyncConsole = new();
 
     private static bool _isWorking;
 
     private Thread? _threadRecv;
     private Thread? _threadControl;
     private int _lastIdHandler;
+
+    public static void Start(string[] args)
+    {
+        Console.Clear();
+        
+        var port = ReadPort(args);
+        
+        var server = new Server(port);
+        var threadServer = new Thread(_ => server.StartServer());
+        threadServer.Start();
+        
+        Console.CancelKeyPress += (_, e) =>
+        {
+            e.Cancel = true;
+            server.StopServer();
+            _isWorking = false;
+            threadServer.Join();
+        };
+        
+        ReadCommands(server);
+        
+        threadServer.Join();
+    }
+
+    public void Cancel(int id)
+    {
+        
+        _fileStreams[id].Close();
+        _fileStreams[id].Dispose();
+        _fileStreams.Remove(id);
+        if (File.Exists(_filePaths[id]))
+        {
+            File.Delete(_filePaths[id]);
+        }
+        _filePaths.Remove(id);
+        _timesLastSegment.Remove(id);
+        FileStreamsSync.Remove(id);
+        _clientHandlers[id].SetTransferData(new TransferData(_clientHandlers[id], this));
+    }
+
+    public void Final(int id)
+    {
+        if (!_fileStreams.TryGetValue(id, out var value))
+        {
+            return;
+        }
+        Printer.Print($"File {_filePaths[id]} successfully wrote", -1, -1);
+        value.Close();
+        value.Dispose();
+        _fileStreams.Remove(id);
+        _filePaths.Remove(id);
+        _timesLastSegment.Remove(id);
+        FileStreamsSync.Remove(id);
+        _clientHandlers[id].SetTransferData(new TransferData(_clientHandlers[id], this));
+        
+    }
+
+    public void CloseHandler(int id)
+    {
+        if (_fileStreams.TryGetValue(id, out var value))
+        {
+            value.Close();
+            value.Dispose();
+            _fileStreams.Remove(id);
+            _filePaths.Remove(id);
+            _timesLastSegment.Remove(id);
+            FileStreamsSync.Remove(id);
+        }
+        _clientHandlers[id].Close();
+        _clientHandlers.Remove(id);
+    }
+
+    public void SetPartFile(byte[] part, long sizePart, long numberPart, int maxSizePart, int id)
+    {
+        lock (FileStreamsSync[id])
+        {
+            var offset = maxSizePart * numberPart;
+            _fileStreams[id].Seek(offset, SeekOrigin.Begin);
+            _fileStreams[id].Write(part, 0, (int)sizePart);
+        }
+    }
+
+    public void SetFileInfo(long size, string fileName, int id)
+    {
+        Directory.CreateDirectory("uploads");
+        fileName = Path.Combine("uploads", fileName).Split('\0')[0];
+        if (File.Exists(fileName))
+        {
+            var index = fileName.LastIndexOf('.');
+            var number = 0;
+            while (true)
+            {
+                var newFileName = fileName[..(index == -1 ? fileName.Length : index)] +
+                                  " (" + number++ + ")" + fileName[(index == -1 ? fileName.Length : index)..];
+                if (!File.Exists(newFileName))
+                {
+                    fileName = newFileName;
+                    break;
+                }
+            }
+        }
+        _filePaths[id] = fileName;
+        _fileStreams[id] =  new FileStream(_filePaths[id], FileMode.CreateNew,  FileAccess.Write, FileShare.None);
+        _fileStreams[id].SetLength(size);
+        _timesLastSegment[id] = DateTime.Now;
+        FileStreamsSync[id] = new object();
+    }
     
     private Server(int port)
     {
@@ -51,9 +158,7 @@ public class Server
                 sb.AppendFormat($"  {addr}\n");
             }
         }
-        // Print(Console.GetCursorPosition().ToString(), -1, -1);
-        // Print(_numberOfLinesOnConsole.ToString(), -1, -1);
-        Print(sb.ToString(), -1, -1);
+        Printer.Print(sb.ToString(), -1, -1);
     }
 
     private int GetPort()
@@ -69,36 +174,6 @@ public class Server
     private static IPAddress[] GetIpAddress()
     {
         return Dns.GetHostAddresses(Dns.GetHostName());
-    }
-
-    public static void Print(string? msg, int cursorLeft, int cursorTop)
-    {
-        lock (SyncConsole)
-        {
-            if (cursorLeft < 0 || cursorTop < 0)
-            {
-                if (msg != null)
-                {
-                    Console.WriteLine(msg);
-                }
-                else
-                {
-                    Console.WriteLine();
-                }
-            }
-            else
-            {
-                if (msg == null) return;
-                var (savePositionLeft, savePositionTop) = Console.GetCursorPosition(); 
-                var lines = msg.Split('\n');
-                for (var i = 0; i < lines.Length; i++)
-                {
-                    Console.SetCursorPosition(cursorLeft, cursorTop + i); 
-                    Console.Write(lines[i].PadRight(Console.WindowWidth - cursorLeft));
-                } 
-                Console.SetCursorPosition(savePositionLeft, savePositionTop);
-            }
-        }
     }
     
     private void StartServer()
@@ -143,54 +218,6 @@ public class Server
         }
     }
 
-    public void Cancel(int id)
-    {
-        
-        _fileStreams[id].Close();
-        _fileStreams[id].Dispose();
-        _fileStreams.Remove(id);
-        if (File.Exists(_filePaths[id]))
-        {
-            File.Delete(_filePaths[id]);
-        }
-        _filePaths.Remove(id);
-        _timesLastSegment.Remove(id);
-        FileStreamsSync.Remove(id);
-        _clientHandlers[id].SetTransferData(new TransferData(_clientHandlers[id], this));
-    }
-
-    public void Final(int id)
-    {
-        if (!_fileStreams.TryGetValue(id, out var value))
-        {
-            return;
-        }
-        Print($"File {_filePaths[id]} successfully wrote", -1, -1);
-        value.Close();
-        value.Dispose();
-        _fileStreams.Remove(id);
-        _filePaths.Remove(id);
-        _timesLastSegment.Remove(id);
-        FileStreamsSync.Remove(id);
-        _clientHandlers[id].SetTransferData(new TransferData(_clientHandlers[id], this));
-        
-    }
-
-    public void CloseHandler(int id)
-    {
-        if (_fileStreams.TryGetValue(id, out var value))
-        {
-            value.Close();
-            value.Dispose();
-            _fileStreams.Remove(id);
-            _filePaths.Remove(id);
-            _timesLastSegment.Remove(id);
-            FileStreamsSync.Remove(id);
-        }
-        _clientHandlers[id].Close();
-        _clientHandlers.Remove(id);
-    }
-
     private void StopServer()
     {
         _isWorking = false;
@@ -208,42 +235,6 @@ public class Server
         _threadRecv?.Join();
     }
 
-    public void SetPartFile(byte[] part, long sizePart, long numberPart, int maxSizePart, int id)
-    {
-        lock (FileStreamsSync[id])
-        {
-            var offset = maxSizePart * numberPart;
-            _fileStreams[id].Seek(offset, SeekOrigin.Begin);
-            _fileStreams[id].Write(part, 0, (int)sizePart);
-        }
-    }
-
-    public void SetFileInfo(long size, string fileName, int id)
-    {
-        Directory.CreateDirectory("uploads");
-        fileName = Path.Combine("uploads", fileName).Split('\0')[0];
-        if (File.Exists(fileName))
-        {
-            var index = fileName.LastIndexOf('.');
-            var number = 0;
-            while (true)
-            {
-                var newFileName = fileName[..(index == -1 ? fileName.Length : index)] +
-                                  " (" + number++ + ")" + fileName[(index == -1 ? fileName.Length : index)..];
-                if (!File.Exists(newFileName))
-                {
-                    fileName = newFileName;
-                    break;
-                }
-            }
-        }
-        _filePaths[id] = fileName;
-        _fileStreams[id] =  new FileStream(_filePaths[id], FileMode.CreateNew,  FileAccess.Write, FileShare.None);
-        _fileStreams[id].SetLength(size);
-        _timesLastSegment[id] = DateTime.Now;
-        FileStreamsSync[id] = new object();
-    }
-
     private static void ReadCommands(Server server)
     {
         while (_isWorking)
@@ -253,17 +244,17 @@ public class Server
             {
                 switch (str)
                 {
-                    case "port": Print("Port: " + server.GetPort(), -1, -1); break;
+                    case "port": Printer.Print("Port: " + server.GetPort(), -1, -1); break;
                     case "ip": var addresses = GetIpAddress();
                         foreach (var addr in addresses)
                         {
                             if (addr.AddressFamily == AddressFamily.InterNetwork || addr.AddressFamily == AddressFamily.InterNetworkV6)
                             {
-                                Print(addr.ToString(), -1, -1);
+                                Printer.Print(addr.ToString(), -1, -1);
                             }
                         }
                         break;
-                    case "dns": Print("DNS: " + GetDns(), -1, -1); break;
+                    case "dns": Printer.Print("DNS: " + GetDns(), -1, -1); break;
                     case "exit": server.StopServer(); break;
                 }
             }
@@ -272,40 +263,16 @@ public class Server
 
     private static int ReadPort(string[] args)
     {
-        const int defaultPort = 1123;
-        if (args.Length <= 0) return defaultPort;
+        if (args.Length <= 0) return AppConstants.DefaultPort;
         try
         {
             return int.Parse(args[0]);
         }
         catch (Exception)
         {
-            Print("USAGE:\ndotnet Server.dll <port>\n", -1, -1);
+            Printer.Print("USAGE:\ndotnet Server.dll <port>\n", -1, -1);
             Environment.Exit(-1);
         }
-        return defaultPort;
-    }
-
-    public static void Main(string[] args)
-    {
-        Console.Clear();
-        
-        var port = ReadPort(args);
-        
-        var server = new Server(port);
-        var threadServer = new Thread(_ => server.StartServer());
-        threadServer.Start();
-        
-        Console.CancelKeyPress += (_, e) =>
-        {
-            e.Cancel = true;
-            server.StopServer();
-            _isWorking = false;
-            threadServer.Join();
-        };
-        
-        ReadCommands(server);
-        
-        threadServer.Join();
+        return AppConstants.DefaultPort;
     }
 }

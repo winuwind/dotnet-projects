@@ -1,7 +1,7 @@
 ﻿namespace Client;
 
 using System.Net.Sockets;
-using ProtocolLibrary.Handler;
+using Protocol.Handler;
 
 public class ServerHandler : AbstractHandler
 {
