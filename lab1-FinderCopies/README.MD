@@ -41,22 +41,14 @@ dotnet FinderCopies.dll -- [опции]
 ### Запуск с IPv4 группой
 
 ```bash
-dotnet run -- -a 239.255.0.1 -p 25565
+dotnet FinderCopies.dll -a 239.255.0.1 -p 25565
 ```
 
 ### Запуск с IPv6 группой
 
 ```bash
-dotnet run -- -a ff02::1 -p 25565
+dotnet FinderCopies.dll -a ff02::1 -p 25565
 ```
-
-### Запуск из собранной DLL
-
-```bash
-dotnet bin/Debug/net8.0/FinderCopies.dll -a 239.255.0.1 -p 25565
-```
-
----
 
 ## 🔹 Сборка
 
@@ -72,11 +64,3 @@ dotnet bin/Debug/net8.0/FinderCopies.dll -a 239.255.0.1 -p 25565
    ```bash
    dotnet build
    ```
-
-3. Запустить:
-
-   ```bash
-   dotnet run -- -a 239.255.0.1 -p 25565
-   ```
-
----
