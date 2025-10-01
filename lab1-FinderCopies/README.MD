@@ -19,7 +19,7 @@
 ## 🔹 Параметры запуска
 
 ```bash
-dotnet run -- [опции]
+dotnet FinderCopies.dll -- [опции]
 ````
 
 ### Опции
