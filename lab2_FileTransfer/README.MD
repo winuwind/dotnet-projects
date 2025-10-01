@@ -59,15 +59,14 @@ dotnet build
 ### Запуск сервера
 
 ```bash
-dotnet run --project Server -- <порт>
+dotnet Server.dll -- <порт>
 ```
-
 * `<порт>` — порт, на котором сервер будет принимать соединения.
 
 ### Запуск клиента
 
 ```bash
-dotnet run --project Client -- [опции]
+dotnet Client.dll -- [опции]
 ```
 ### Опции
 
