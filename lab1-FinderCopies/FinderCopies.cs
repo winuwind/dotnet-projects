@@ -163,6 +163,7 @@ public class FinderCopies
             UpdateDeviceTable(isUpdated);
         }
     }
+    
     public void Execute()
     {
         Console.CancelKeyPress += (_, e) =>
