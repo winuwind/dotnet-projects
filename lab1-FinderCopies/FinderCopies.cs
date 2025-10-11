@@ -57,6 +57,7 @@ public class FinderCopies
             SocketOptionName.MulticastTimeToLive, 1);
 
     }
+    
     private void SendMessageToGroup()
     {
         var dest = new IPEndPoint(IPAddress.Parse(_multicastGroupAddr), _port);
