@@ -149,7 +149,9 @@ public class TransferData(ClientHandler handler, Server server) : ITransfer
             }
             
             Printer.Print("Transfer of file started", -1, -1);
-            (_cursorLeft, _cursorTop) = Console.GetCursorPosition();
+
+            (_cursorLeft, _cursorTop) = Printer.GetCursorPosition();
+            
             Printer.Print("", -1, -1);
             Printer.Print("", -1, -1);
             Printer.Print("", -1, -1);
@@ -159,7 +161,6 @@ public class TransferData(ClientHandler handler, Server server) : ITransfer
             {
                 _receivedParts[i] = false;
             }
-
             if (segment.SegmentData.Data != null) _fileName = Encoding.UTF8.GetString(segment.SegmentData.Data);
             if (_fileName != null) _server?.SetFileInfo(segment.SegmentData.Size, _fileName, id);
 
@@ -171,7 +172,7 @@ public class TransferData(ClientHandler handler, Server server) : ITransfer
             
             _startTime = DateTime.Now;
             _lastTime = DateTime.Now;
-
+            
             _thread = new Thread(_ =>
             {
                 while (!(_isCanceled || _isFinal) && _isStarted)

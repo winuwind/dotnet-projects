@@ -44,6 +44,7 @@ public class Client
 
     public void Exit()
     {
+        Console.WriteLine("Server closed connection");
         _running = false;
         _serverHandler.Close();
         _client.Close();

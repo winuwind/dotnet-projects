@@ -156,8 +156,8 @@ public class TransferData : ITransfer
             }
             case TypeSegment.Ok when _isStarted:
                 Console.WriteLine($"File {_filePath} transferred to server");
-                _thread?.Join();
                 _isCompleted = true;
+                _thread?.Join();
                 break;
             case TypeSegment.Ok:
                 _isStarted = true;

@@ -2,7 +2,7 @@
 
 public static class AppConstants
 {
-    public const int MaxLenghtName = 4096;
+    public const int MaxLenghtName = 4096 * 16;
     public const int DefaultPort = 1123;
     public const int MaxSizeData = 4096;
     public const int HeaderLenght = 40;
