@@ -11,8 +11,8 @@ namespace AsyncApiRequests.Location;
 
 public class LocationInfo
 {
-    private const string GhApiKey = "45c27055-9b34-41e7-b998-1ae3db0dee12";
-    private const string OtpApiKey = "5ae2e3f221c38a28845f05b6900ef8897bdae6e43d5900fedd5f515e";
+    private static string GhApiKey = "45c27055-9b34-41e7-b998-1ae3db0dee12";
+    private static string OtpApiKey = "5ae2e3f221c38a28845f05b6900ef8897bdae6e43d5900fedd5f515e";
     
     private string _location;
     
@@ -31,15 +31,24 @@ public class LocationInfo
         _id = -1;
     }
 
-    public async Task GetInfo()
+    public static void SetKeys(string ghApiKey, string otpApiKey)
     {
-        await GetAndPrintPlaces();
-        if (_id == -1)
-        {
-            return;
-        }
+        GhApiKey = ghApiKey.Length > 0 ? ghApiKey : GhApiKey;
+        OtpApiKey = otpApiKey.Length > 0 ? otpApiKey : OtpApiKey;
+    }
 
-        await GetPlaceInfo();
+    public Task GetInfo()
+    {
+        return GetAndPrintPlaces().ContinueWith(_ =>
+        {
+            if (_id == -1)
+            {
+                return Task.CompletedTask;
+            }
+            var weatherTask = GetWeather();
+            var placesTask = GetInterestingPlaces();
+            return Task.WhenAll(weatherTask, placesTask);
+        }).Unwrap();
     }
 
     public void PrintInfo()
@@ -88,111 +97,84 @@ public class LocationInfo
         Console.WriteLine("=======================================================================");
     }
 
-    private async Task GetPlaceInfo()
-    {
-        var weatherTask = GetWeather();
-        var placesTask = GetInterestingPlaces();
-
-        await Task.WhenAll(weatherTask, placesTask);
-    }
-
-    private async Task GetAndPrintPlaces()
+    private Task GetAndPrintPlaces()
     {
         var request = new HttpRequestMessage(HttpMethod.Get, "https://graphhopper.com/api/1/geocode?q=" + _location + "&key=" + GhApiKey);
-        var response = await ApiRequestWorker.Send(request);
-        if (!response.IsSuccessStatusCode)
-        {
-            Console.WriteLine("graphhopper: " + response.StatusCode);
-            return;
-        }
-        var placesData = await response.Content.ReadFromJsonAsync<PlacesData>();
-        if (placesData == null)
-        {
-            Console.WriteLine("No places found");
-            return;
-        }
-        var hits = placesData.Hits;
-        if (hits.Length == 0)
-        {
-            Console.WriteLine("No places found");
-            return;
-        }
-        for (var i = 0; i < hits.Length; i++)
-        {
-            var hit = hits[i];
-            Console.WriteLine($"Id: {i}");
-            Console.WriteLine($"Osm_id: {hit.OsmId}");
-            Console.WriteLine($"Name: {hit.Name}");
-            Console.WriteLine($"Coordinates: {hit.Point?.Lat}, {hit.Point?.Lng}");
-            Console.WriteLine($"Country: {hit.Country}");
-            if (hit.City != null)
+        return ApiRequestWorker.Send(request).ContinueWith(responseTask =>
             {
-                Console.WriteLine($"City: {hit.City}"); 
-            }
-        
-            if (hit.Street != null)
-            {
-                Console.WriteLine($"Street: {hit.Street}");
-            }
-        
-            if (hit.HouseNumber != null)
-            {
-                Console.WriteLine($"Number of House: {hit.HouseNumber}");
-            }
-        
-            if (hit.Postcode != null)
-            {
-                Console.WriteLine($"Postal code: {hit.Postcode}");
-            }
-            Console.WriteLine();
-        }
-        
-        Console.Write("Enter Id of place which you want to search (-1 if you want to choose another location): ");
-        var osmId = Console.ReadLine();
-        _id = -1;
-        if (osmId != null)
-        {
-            if (!int.TryParse(osmId, out _id))
-            {
-                if (osmId == "exit")
+                var response = responseTask.Result;
+                if (!response.IsSuccessStatusCode)
                 {
-                    return;
+                    Console.WriteLine("graphhopper: " + response.StatusCode);
+                    return Task.CompletedTask;
                 }
-            }
-        }
-        else
-        {
-            return;
-        }
-        while ((_id < 0 || _id >= hits.Length) && _id != -1 )
-        {
-            Console.Write("Enter a number from {0, ..., " + (hits.Length - 1) + "}: ");
-            osmId = Console.ReadLine();
-            if (osmId != null)
-            {
-                if (!int.TryParse(osmId, out _id))
-                {
-                    if (osmId == "exit")
-                    {
-                        return;
-                    }
-                }
-            }
-            else
-            {
-                return;
-            }
-        }
 
-        if (_id == -1)
-        {
-            return;
-        }
-        _point = hits[_id].Point;
-        _location = hits[_id].Name ?? _location;
+                return response.Content.ReadFromJsonAsync<PlacesData>().ContinueWith(placesTask =>
+                    {
+                        var placesData = placesTask.Result;
+                        if (placesData == null || placesData.Hits.Length == 0)
+                        {
+                            Console.WriteLine("No places found");
+                            return;
+                        }
+
+                        var hits = placesData.Hits;
+                        for (var i = 0; i < hits.Length; i++)
+                        {
+                            var hit = hits[i];
+                            Console.WriteLine($"Id: {i}");
+                            Console.WriteLine($"Osm_id: {hit.OsmId}");
+                            Console.WriteLine($"Name: {hit.Name}");
+                            Console.WriteLine($"Coordinates: {hit.Point?.Lat}, {hit.Point?.Lng}");
+                            Console.WriteLine($"Country: {hit.Country}");
+                            if (hit.City != null)
+                                Console.WriteLine($"City: {hit.City}");
+                            if (hit.Street != null)
+                                Console.WriteLine($"Street: {hit.Street}");
+                            if (hit.HouseNumber != null)
+                                Console.WriteLine($"Number of House: {hit.HouseNumber}");
+                            if (hit.Postcode != null)
+                                Console.WriteLine($"Postal code: {hit.Postcode}");
+                            Console.WriteLine();
+                        }
+
+                        Console.Write("Enter Id of place which you want to search (-1 if you want to choose another location): ");
+                        var osmId = Console.ReadLine();
+                        _id = -1;
+                        if (osmId != null)
+                        {
+                            if (!int.TryParse(osmId, out _id))
+                            {
+                                if (osmId == "exit")
+                                    return;
+                            }
+                        }
+
+                        while ((_id < 0 || _id >= hits.Length) && _id != -1)
+                        {
+                            Console.Write("Enter a number from {0, ..., " + (hits.Length - 1) + "}: ");
+                            osmId = Console.ReadLine();
+                            if (osmId != null)
+                            {
+                                if (!int.TryParse(osmId, out _id))
+                                {
+                                    if (osmId == "exit")
+                                        return;
+                                }
+                            }
+                        }
+
+                        if (_id != -1)
+                        {
+                            _point = hits[_id].Point;
+                            _location = hits[_id].Name ?? _location;
+                        }
+                    });
+            })
+            .Unwrap();
     }
 
-    private async Task GetHourlyWeather()
+    private Task GetHourlyWeather()
     {
         var lat = ("latitude=" + _point?.Lat).Replace(',', '.');
         var lng = ("longitude=" + _point?.Lng).Replace(',', '.');
@@ -204,16 +186,22 @@ public class LocationInfo
                                                              "&precipitation_unit=mm" + 
                                                              "&pressure_unit=hpa" + 
                                                              "&timezone=UTC%2B7");
-        var response = await ApiRequestWorker.Send(request);
-        if (!response.IsSuccessStatusCode)
+        return ApiRequestWorker.Send(request).ContinueWith(responseTask =>
         {
-            Console.WriteLine("open-meteo: " + response.StatusCode);
-            return;
-        }
-        _weather = await response.Content.ReadFromJsonAsync<WeatherResponse>();
+            var response = responseTask.Result;
+            if (!response.IsSuccessStatusCode)
+            {
+                Console.WriteLine("open-meteo: " + response.StatusCode);
+                return Task.CompletedTask;
+            }
+            return response.Content.ReadFromJsonAsync<WeatherResponse>().ContinueWith(weatherTask =>
+            {
+                _weather = weatherTask.Result;
+            });
+        }).Unwrap();
     }
     
-    private async Task GetCurrentWeather()
+    private Task GetCurrentWeather()
     {
         var lat = ("latitude=" + _point?.Lat).Replace(',', '.');
         var lng = ("longitude=" + _point?.Lng).Replace(',', '.');
@@ -225,13 +213,19 @@ public class LocationInfo
                                                              "&precipitation_unit=mm" + 
                                                              "&pressure_unit=hpa" + 
                                                              "&timezone=UTC%2B7");
-        var response = await ApiRequestWorker.Send(request);
-        if (!response.IsSuccessStatusCode)
+        return ApiRequestWorker.Send(request).ContinueWith(responseTask =>
         {
-            Console.WriteLine("open-meteo: " + response.StatusCode);
-            return;
-        }
-        _currentWeather = await response.Content.ReadFromJsonAsync<WeatherResponse>();
+            var response = responseTask.Result;
+            if (!response.IsSuccessStatusCode)
+            {
+                Console.WriteLine("open-meteo: " + response.StatusCode);
+                return Task.CompletedTask;
+            }
+            return response.Content.ReadFromJsonAsync<WeatherResponse>().ContinueWith(weatherTask =>
+            {
+                _currentWeather = weatherTask.Result;
+            });
+        }).Unwrap();
     }
 
     private async Task GetWeather()
@@ -241,7 +235,7 @@ public class LocationInfo
         await Task.WhenAll(taskHourly, taskCurrent);
     }
 
-    private async Task GetInterestingPlaces()
+    private Task GetInterestingPlaces()
     {
         var lat = ("lat=" + _point?.Lat).Replace(',', '.');
         var lng = ("lon=" + _point?.Lng).Replace(',', '.');
@@ -249,33 +243,44 @@ public class LocationInfo
                                                              + "radius=50000"
                                                              + "&kinds=interesting_places"
                                                              + "&" + lng + "&" + lat
-                                                             + "&limit=10"
+                                                             + "&limit=9"
                                                              + "&apikey=" + OtpApiKey
                                                              );
-        var response = await ApiRequestWorker.Send(request);
-        if (!response.IsSuccessStatusCode)
+        return ApiRequestWorker.Send(request).ContinueWith(responseTask =>
         {
-            Console.WriteLine("opentripmap: " + response.StatusCode);
-            return;
-        }
-
-        var desResponse = await response.Content.ReadFromJsonAsync<InterestingPlaces>();
-        var tasks = new List<Task>();
-        foreach (var feature in desResponse.Features)
-        {
-            tasks.Add(GetDescription(feature));
-        }
-        
-        await Task.WhenAll(tasks);
+            var response = responseTask.Result;
+            if (!response.IsSuccessStatusCode)
+            {
+                Console.WriteLine("opentripmap: " + response.StatusCode);
+                return Task.CompletedTask;
+            }
+            return response.Content.ReadFromJsonAsync<InterestingPlaces>().ContinueWith(desResponseTask =>
+            {
+                var desResponse =  desResponseTask.Result;
+                var tasks = desResponse.Features.Select(GetDescription);
+                return Task.WhenAll(tasks);
+            });
+        }).Unwrap();
     }
 
-    private async Task GetDescription(Feature feature)
+    private Task GetDescription(Feature feature)
     {
         var request = new HttpRequestMessage(HttpMethod.Get, "https://api.opentripmap.com/0.1/ru/places/" +
                                                              "xid/" + feature.Properties.Xid +
                                                              "?apikey=" + OtpApiKey);
-        var response = await ApiRequestWorker.Send(request);
-        var placesInfo =  await response.Content.ReadFromJsonAsync<PlacesInfo>();
-        _interestingPlaces[feature.Id] = placesInfo;
+        return ApiRequestWorker.Send(request).ContinueWith(responseTask =>
+        {
+            var response = responseTask.Result;
+            if (!response.IsSuccessStatusCode)
+            {
+                Console.WriteLine("opentripmap: " + response.StatusCode);
+                return Task.CompletedTask;
+            }
+            return response.Content.ReadFromJsonAsync<PlacesInfo>().ContinueWith(placesInfoTask =>
+            {
+                var placesInfo = placesInfoTask.Result;
+                _interestingPlaces[feature.Id] = placesInfo;
+            });
+        }).Unwrap();
     }
 }

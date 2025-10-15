@@ -2,9 +2,18 @@
 
 public static class ApiRequestWorker
 {
-    public static async Task<HttpResponseMessage> Send(HttpRequestMessage msg)
+    private static readonly HttpClient Сlient = new HttpClient();
+    
+    static ApiRequestWorker()
     {
-        using var client = new HttpClient();
-        return await client.SendAsync(msg);
+        AppDomain.CurrentDomain.ProcessExit += (_, _) =>
+        {
+            Сlient.Dispose();
+        };
+    }
+    
+    public static Task<HttpResponseMessage> Send(HttpRequestMessage msg)
+    {
+        return Сlient.SendAsync(msg);
     }
 }

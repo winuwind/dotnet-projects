@@ -19,6 +19,16 @@ public class MainClass
             Console.InputEncoding = Encoding.GetEncoding(866);
             Console.OutputEncoding = Encoding.GetEncoding(866);
         }
+        
+        Console.Write("Enter your API key for GraphHopper API (nothing to default): ");
+        var ghApiKey = Console.ReadLine();
+        Console.Write("Enter your API key for OpenTripMap API (nothing to default): ");
+        var otmApiKey = Console.ReadLine();
+        if (ghApiKey == null || otmApiKey == null)
+        {
+            return;
+        }
+        LocationInfo.SetKeys(ghApiKey, otmApiKey);
         while (true)
         {
             Console.Write("Enter name of location which you want to search (\"exit\" for exit): ");
