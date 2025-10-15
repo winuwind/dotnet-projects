@@ -6,14 +6,12 @@ using AsyncApiRequests.OpenMeteoResponse;
 using AsyncApiRequests.OpenTripMapResponsePlaces;
 using AsyncApiRequests.OpenTripMapResponseDescription;
 using AsyncApiRequests.ApiRequest;
+using AsyncApiRequests.Config;
 
 namespace AsyncApiRequests.Location;
 
 public class LocationInfo
 {
-    private static string GhApiKey = "45c27055-9b34-41e7-b998-1ae3db0dee12";
-    private static string OtpApiKey = "5ae2e3f221c38a28845f05b6900ef8897bdae6e43d5900fedd5f515e";
-    
     private string _location;
     
     private int _id;
@@ -29,12 +27,6 @@ public class LocationInfo
         _weather = null;
         _interestingPlaces = new ConcurrentDictionary<string, PlacesInfo>();
         _id = -1;
-    }
-
-    public static void SetKeys(string ghApiKey, string otpApiKey)
-    {
-        GhApiKey = ghApiKey.Length > 0 ? ghApiKey : GhApiKey;
-        OtpApiKey = otpApiKey.Length > 0 ? otpApiKey : OtpApiKey;
     }
 
     public Task GetInfo()
@@ -99,7 +91,7 @@ public class LocationInfo
 
     private Task GetAndPrintPlaces()
     {
-        var request = new HttpRequestMessage(HttpMethod.Get, "https://graphhopper.com/api/1/geocode?q=" + _location + "&key=" + GhApiKey);
+        var request = new HttpRequestMessage(HttpMethod.Get, $"{AppConstants.GraphHopperBaseUrl}?q={_location}&key={AppConstants.GraphHopperApiKey}");
         return ApiRequestWorker.Send(request).ContinueWith(responseTask =>
             {
                 var response = responseTask.Result;
@@ -178,14 +170,13 @@ public class LocationInfo
     {
         var lat = ("latitude=" + _point?.Lat).Replace(',', '.');
         var lng = ("longitude=" + _point?.Lng).Replace(',', '.');
-        var request = new HttpRequestMessage(HttpMethod.Get, "https://api.open-meteo.com/v1/forecast?"
-                                                             + lat + "&" + lng + 
+        var request = new HttpRequestMessage(HttpMethod.Get, $"{AppConstants.OpenMeteoBaseUrl}?{lat}&{lng}" +
                                                              "&hourly=temperature_2m,relativehumidity_2m,precipitation_probability,precipitation,windspeed_10m,surface_pressure,cloudcover" +
-                                                             "&temperature_unit=celsius" + 
-                                                             "&windspeed_unit=ms" + 
-                                                             "&precipitation_unit=mm" + 
-                                                             "&pressure_unit=hpa" + 
-                                                             "&timezone=UTC%2B7");
+                                                             $"&temperature_unit={AppConstants.TempUnit}" + 
+                                                             $"&windspeed_unit={AppConstants.WindUnit}" + 
+                                                             $"&precipitation_unit={AppConstants.PrecipitationUnit}" + 
+                                                             $"&pressure_unit={AppConstants.PressureUnit}" + 
+                                                             $"&timezone={AppConstants.TimeZone}");
         return ApiRequestWorker.Send(request).ContinueWith(responseTask =>
         {
             var response = responseTask.Result;
@@ -205,14 +196,13 @@ public class LocationInfo
     {
         var lat = ("latitude=" + _point?.Lat).Replace(',', '.');
         var lng = ("longitude=" + _point?.Lng).Replace(',', '.');
-        var request = new HttpRequestMessage(HttpMethod.Get, "https://api.open-meteo.com/v1/forecast?"
-                                                             + lat + "&" + lng + 
+        var request = new HttpRequestMessage(HttpMethod.Get, $"{AppConstants.OpenMeteoBaseUrl}?{lat}&{lng}" +
                                                              "&current=temperature_2m,relativehumidity_2m,precipitation_probability,precipitation,windspeed_10m,surface_pressure,cloudcover" +
-                                                             "&temperature_unit=celsius" + 
-                                                             "&windspeed_unit=ms" + 
-                                                             "&precipitation_unit=mm" + 
-                                                             "&pressure_unit=hpa" + 
-                                                             "&timezone=UTC%2B7");
+                                                             $"&temperature_unit={AppConstants.TempUnit}" + 
+                                                             $"&windspeed_unit={AppConstants.WindUnit}" + 
+                                                             $"&precipitation_unit={AppConstants.PrecipitationUnit}" + 
+                                                             $"&pressure_unit={AppConstants.PressureUnit}" + 
+                                                             $"&timezone={AppConstants.TimeZone}");
         return ApiRequestWorker.Send(request).ContinueWith(responseTask =>
         {
             var response = responseTask.Result;
@@ -239,13 +229,12 @@ public class LocationInfo
     {
         var lat = ("lat=" + _point?.Lat).Replace(',', '.');
         var lng = ("lon=" + _point?.Lng).Replace(',', '.');
-        var request = new HttpRequestMessage(HttpMethod.Get, "https://api.opentripmap.com/0.1/en/places/radius?"
-                                                             + "radius=50000"
-                                                             + "&kinds=interesting_places"
-                                                             + "&" + lng + "&" + lat
-                                                             + "&limit=9"
-                                                             + "&apikey=" + OtpApiKey
-                                                             );
+        var request = new HttpRequestMessage(HttpMethod.Get, $"{AppConstants.OpenTripMapBaseUrl}/ru/places/radius?" +
+                                                             $"radius={AppConstants.PlacesRadius}" +
+                                                             "&kinds=interesting_places" +
+                                                             $"&{lat}&{lng}" +
+                                                             $"&limit={AppConstants.PlacesLimit}" +
+                                                             $"&apikey={AppConstants.OpenTripMapApiKey}");
         return ApiRequestWorker.Send(request).ContinueWith(responseTask =>
         {
             var response = responseTask.Result;
@@ -265,9 +254,9 @@ public class LocationInfo
 
     private Task GetDescription(Feature feature)
     {
-        var request = new HttpRequestMessage(HttpMethod.Get, "https://api.opentripmap.com/0.1/ru/places/" +
-                                                             "xid/" + feature.Properties.Xid +
-                                                             "?apikey=" + OtpApiKey);
+        var request = new HttpRequestMessage(HttpMethod.Get, $"{AppConstants.OpenTripMapBaseUrl}/ru/places/" +
+                                                             $"xid/{feature.Properties.Xid}" +
+                                                             $"?apikey={AppConstants.OpenTripMapApiKey}");
         return ApiRequestWorker.Send(request).ContinueWith(responseTask =>
         {
             var response = responseTask.Result;
