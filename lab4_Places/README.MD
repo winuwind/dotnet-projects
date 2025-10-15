@@ -76,6 +76,30 @@ Enter name of location which you want to search ("exit" for exit):
 
 ---
 
+## Конфигурация
+
+Для запуска программы в своей конфигурации можно создать файл со следующими полями:
+
+### .env
+
+```
+GRAPH_HOPPER_API_KEY=
+OPEN_TRIPMAP_API_KEY=
+
+PLACES_RADIUS=
+PLACES_LIMIT=
+
+TIMEZONE=UTC%2B7
+TEMPERATURE_UNIT=celsius
+WINDSPEED_UNIT=ms
+PRECIPITATION_UNIT=mm
+PRESSURE_UNIT=hpa
+```
+
+Поля с ключами необходимо заполнить для работоспособности программы.
+
+---
+
 ## Особенности
 
 * Полностью асинхронная архитектура без блокировок.
