@@ -100,7 +100,7 @@ public class Client
     {
         Console.WriteLine("Usage: dotnet Client.dll <params>" +
                           "\n\t\"-a\" - ip address of server" +
-                          "\n\t\"-p\\\" - port of server\"" +
+                          "\n\t\"-p\" - port of server\"" +
                           "\n\t\"-d\" - domain name of server" +
                           "\nYou must specify port, also you must specify ip or dns.");
         
