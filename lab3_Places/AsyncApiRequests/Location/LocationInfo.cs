@@ -50,7 +50,7 @@ public class LocationInfo
             return;
         }
         
-        Console.WriteLine("Forecast: How much time do you want to view the weather for? (days * 24 + hours must be less then 5 * 24 = 120");
+        Console.WriteLine("Forecast: How much time do you want to view the weather for? (days * 24 + hours must be less then 5 * 24 = 120)");
         Console.Write("Days {0, ..., 5}: ");
         var days = Console.ReadLine();
         int countDays;
@@ -91,7 +91,7 @@ public class LocationInfo
 
     private Task GetAndPrintPlaces()
     {
-        var request = new HttpRequestMessage(HttpMethod.Get, $"{AppConstants.GraphHopperBaseUrl}?q={_location}&key={AppConstants.GraphHopperApiKey}");
+        var request = new HttpRequestMessage(HttpMethod.Get, $"{AppConstants.GraphHopperBaseUrl}?q={_location}&limit={AppConstants.LimitLocation}&key={AppConstants.GraphHopperApiKey}");
         return ApiRequestWorker.Send(request).ContinueWith(responseTask =>
             {
                 var response = responseTask.Result;
@@ -114,8 +114,8 @@ public class LocationInfo
                         for (var i = 0; i < hits.Length; i++)
                         {
                             var hit = hits[i];
-                            Console.WriteLine($"Id: {i}");
-                            Console.WriteLine($"Osm_id: {hit.OsmId}");
+                            Console.WriteLine($"Location number: {i}");
+                            Console.WriteLine($"Type of location: {hit.OsmKey}");
                             Console.WriteLine($"Name: {hit.Name}");
                             Console.WriteLine($"Coordinates: {hit.Point?.Lat}, {hit.Point?.Lng}");
                             Console.WriteLine($"Country: {hit.Country}");
@@ -246,6 +246,11 @@ public class LocationInfo
             return response.Content.ReadFromJsonAsync<InterestingPlaces>().ContinueWith(desResponseTask =>
             {
                 var desResponse =  desResponseTask.Result;
+                if (desResponse.Features == null)
+                {
+                    Console.WriteLine("Zero interesting places were founded or error on opentripmap");
+                    return Task.CompletedTask;
+                }
                 var tasks = desResponse.Features.Select(GetDescription);
                 return Task.WhenAll(tasks);
             });

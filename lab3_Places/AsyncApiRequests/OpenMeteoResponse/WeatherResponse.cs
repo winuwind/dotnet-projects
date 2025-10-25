@@ -28,14 +28,25 @@ public struct WeatherResponse
 
     public void PrintCurrent()
     {
+        Console.BackgroundColor = ConsoleColor.Cyan;
+        Console.ForegroundColor = ConsoleColor.Red;
+        Console.WriteLine("Now:");
         Console.BackgroundColor = ConsoleColor.Green;
         Console.ForegroundColor = ConsoleColor.Magenta;
-        Console.WriteLine("Now:");
         Console.WriteLine($"Temperature: {Current.Temperature2M} {CurrentUnits.Temperature2M}");
         Console.WriteLine($"Wind: {Current.WindSpeed10M} {CurrentUnits.WindSpeed10M}");
         Console.WriteLine($"Cloud cover: {Current.CloudCover} {CurrentUnits.CloudCover}");
         Console.WriteLine($"Precipitation: {Current.Precipitation} {CurrentUnits.Precipitation}");
-        Console.WriteLine($"Surface pressure: {Current.SurfacePressure} {CurrentUnits.SurfacePressure}");
+        var pressure = 0.0;
+        if (CurrentUnits.SurfacePressure == "hPa")
+        {
+            pressure =  Current.SurfacePressure * 7.5006156;
+        }
+        else if (CurrentUnits.SurfacePressure == "inch")
+        {
+            pressure = Current.SurfacePressure * 25.4;
+        }
+        Console.WriteLine($"Surface pressure: {Current.SurfacePressure} {CurrentUnits.SurfacePressure}, {pressure} mmHg");
         Console.WriteLine($"Relative humidity: {Current.RelativeHumidity2M} {CurrentUnits.RelativeHumidity2M}");
         Console.ResetColor();
     }
@@ -56,7 +67,16 @@ public struct WeatherResponse
             Console.WriteLine($"Wind: {Hourly.WindSpeed10M[i]} {HourlyUnits.WindSpeed10M}");
             Console.WriteLine($"Cloud cover: {Hourly.CloudCover[i]} {HourlyUnits.CloudCover}");
             Console.WriteLine($"Precipitation: {Hourly.Precipitation[i]} {HourlyUnits.Precipitation}");
-            Console.WriteLine($"Surface pressure: {Hourly.SurfacePressure[i]} {HourlyUnits.SurfacePressure}");
+            var pressure = 0.0;
+            if (HourlyUnits.SurfacePressure == "hPa")
+            {
+                pressure =  Hourly.SurfacePressure[i] * 7.5006156;
+            }
+            else if (HourlyUnits.SurfacePressure == "inch")
+            {
+                pressure = Hourly.SurfacePressure[i] * 25.4;
+            }
+            Console.WriteLine($"Surface pressure: {Hourly.SurfacePressure[i]} {HourlyUnits.SurfacePressure}, {pressure} mmHg");
             Console.WriteLine($"Relative humidity: {Hourly.RelativeHumidity2M[i]} {HourlyUnits.RelativeHumidity2M}");
         }
     }

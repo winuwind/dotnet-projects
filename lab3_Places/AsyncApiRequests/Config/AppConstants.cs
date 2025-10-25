@@ -5,7 +5,9 @@ public static class AppConstants
     public const string GraphHopperBaseUrl = "https://graphhopper.com/api/1/geocode";
     public const string OpenMeteoBaseUrl   = "https://api.open-meteo.com/v1/forecast";
     public const string OpenTripMapBaseUrl = "https://api.opentripmap.com/0.1";
-
+    
+    public const int LimitLocation = 10;
+    
     public static readonly int PlacesRadius = int.Parse(Environment.GetEnvironmentVariable("PLACES_RADIUS") ?? "50000");
     public static readonly int PlacesLimit  = int.Parse(Environment.GetEnvironmentVariable("PLACES_LIMIT") ?? "10");
     public static readonly string TimeZone  = Environment.GetEnvironmentVariable("TIMEZONE") ?? "UTC%2B7";
