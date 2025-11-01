@@ -115,7 +115,7 @@ public class LocationInfo
                         {
                             var hit = hits[i];
                             Console.WriteLine($"Location number: {i}");
-                            Console.WriteLine($"Type of location: {hit.OsmKey}");
+                            Console.WriteLine($"Type of location: {hit.OsmKey}, {hit.OsmValue}");
                             Console.WriteLine($"Name: {hit.Name}");
                             Console.WriteLine($"Coordinates: {hit.Point?.Lat}, {hit.Point?.Lng}");
                             Console.WriteLine($"Country: {hit.Country}");

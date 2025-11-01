@@ -40,7 +40,7 @@ public struct WeatherResponse
         var pressure = 0.0;
         if (CurrentUnits.SurfacePressure == "hPa")
         {
-            pressure =  Current.SurfacePressure * 7.5006156;
+            pressure =  Current.SurfacePressure * 0.75006156;
         }
         else if (CurrentUnits.SurfacePressure == "inch")
         {
@@ -70,7 +70,7 @@ public struct WeatherResponse
             var pressure = 0.0;
             if (HourlyUnits.SurfacePressure == "hPa")
             {
-                pressure =  Hourly.SurfacePressure[i] * 7.5006156;
+                pressure =  Hourly.SurfacePressure[i] * 0.75006156;
             }
             else if (HourlyUnits.SurfacePressure == "inch")
             {
