@@ -18,7 +18,7 @@ public class ConnectionListener : TcpForwarder, IProxy
         
         SocketDest.Close();
         SocketDest.Dispose();
-        
+
         _socket.Close();
         _socket.Dispose();
     }
@@ -104,16 +104,8 @@ public class ConnectionListener : TcpForwarder, IProxy
         
         await MyServer.Send(SocketSource, bytes, 0, sizeBytes, null);
         
-        var thread1 = new Thread(() =>
-        {
-            ForwardTcp(SocketSource, SocketDest).GetAwaiter().GetResult();
-        });
-        thread1.Start();
         
-        var thread2 = new Thread(() =>
-        {
-            ForwardTcp(SocketDest, SocketSource).GetAwaiter().GetResult();
-        });
-        thread2.Start();
+        _ = Task.Run(async () => await ForwardTcp(SocketSource, SocketDest));
+        _ = Task.Run(async () => await ForwardTcp(SocketDest, SocketSource));
     }
 }

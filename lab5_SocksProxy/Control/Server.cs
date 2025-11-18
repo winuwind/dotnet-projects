@@ -14,9 +14,11 @@ public class Server
     private readonly Socket _socketDns;
     private readonly List<Handler> _clients = [];
     private readonly IPAddress _ip = IPAddress.Any;
-    private readonly ConcurrentDictionary<short, TaskCompletionSource<IPAddress>> _pendingDns = new ConcurrentDictionary<short, TaskCompletionSource<IPAddress>>();
-    private readonly ConcurrentDictionary<string, IPAddress> _dns = new ConcurrentDictionary<string, IPAddress>();
+    private readonly ConcurrentDictionary<short, TaskCompletionSource<IPAddress>> _pendingDns = new();
+    private readonly ConcurrentDictionary<string, IPAddress> _dns = new();
     private readonly Selector _selector;
+    private readonly CancellationTokenSource _cts = new();
+    private readonly Lock _lock = new();
 
     private bool _isRunning = true;
 
@@ -148,12 +150,12 @@ public class Server
         var handler = new Handler(clientSocket, this);
         _clients.Add(handler);
 
-        var thread = new Thread(_ =>
+        _ = Task.Run(async () =>
         {
-            handler.CreateConnection().GetAwaiter().GetResult();
-            handler.Work().GetAwaiter().GetResult();
+
+            await handler.CreateConnection();
+            await handler.Work();
         });
-        thread.Start();
     }
 
     public void Start()
@@ -173,19 +175,24 @@ public class Server
             handler.CloseConnection();
         }
         
+        _cts.Cancel();
+        
         _socket.Close();
         _socket.Dispose();
-        
+
         _socketDns.Close();
         _socketDns.Dispose();
     }
 
     public void DeleteClient(Handler handler)
     {
-        foreach (var client in _clients.ToList().Where(client => Equals(client, handler)))
+        lock (_lock)
         {
-            _clients.Remove(client);
-            break;
+            foreach (var client in _clients.ToList().Where(client => Equals(client, handler)))
+            {
+                _clients.Remove(client);
+                break;
+            }
         }
     }
     
@@ -231,15 +238,27 @@ public class Server
         var buffer = new byte[512];
         while (_isRunning)
         {
-            var result = await _socketDns.ReceiveAsync(buffer, SocketFlags.None);
-            var response = buffer[..result];
-            var transactionId = (short) ((response[0] << 8) | response[1]);
-            var ip = ParseDnsResponse(response);
-
-            if (_pendingDns.TryRemove(transactionId, out var tcs))
+            try
             {
-                tcs.SetResult(ip);
+                var result = await _socketDns.ReceiveAsync(buffer, SocketFlags.None, _cts.Token);
+                var response = buffer[..result];
+                var transactionId = (short)((response[0] << 8) | response[1]);
+                var ip = ParseDnsResponse(response);
+
+                if (_pendingDns.TryRemove(transactionId, out var tcs))
+                {
+                    tcs.SetResult(ip);
+                }
             }
+            catch
+            {
+                break;
+            }
+        }
+
+        foreach (var tcs in _pendingDns.Values)
+        {
+            tcs.SetResult(IPAddress.Any);
         }
     }
 
@@ -350,7 +369,7 @@ public class Server
         _pendingDns[transactionId] = tcs;
         
         var request = BuildDnsRequest(hostName, transactionId);
-        await _socketDns.SendAsync(request, SocketFlags.None);
+        await _socketDns.SendAsync(request, SocketFlags.None, _cts.Token);
 
         return await tcs.Task;
     }

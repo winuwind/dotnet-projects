@@ -19,10 +19,7 @@ public class TcpForwarder(Server server, Handler handler, Socket socket, IPAddre
     public void Close()
     {
         IsRunning = false;
-        
-        SocketSource.Close();
-        SocketSource.Dispose();
-        
+
         SocketDest.Close();
         SocketDest.Dispose();
     }
@@ -96,17 +93,8 @@ public class TcpForwarder(Server server, Handler handler, Socket socket, IPAddre
 
     public Task Work()
     {
-        var thread1 = new Thread(() =>
-        {
-            ForwardTcp(SocketSource, SocketDest).GetAwaiter().GetResult();
-        });
-        thread1.Start();
-        
-        var thread2 = new Thread(() =>
-        {
-            ForwardTcp(SocketDest, SocketSource).GetAwaiter().GetResult();
-        });
-        thread2.Start();
+        _ = Task.Run(async () => await ForwardTcp(SocketSource, SocketDest));
+        _ = Task.Run(async () => await ForwardTcp(SocketDest, SocketSource));
         return Task.CompletedTask;
     }
 

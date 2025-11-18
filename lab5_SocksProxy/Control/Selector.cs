@@ -5,14 +5,19 @@ namespace SOCKS_Proxy.Control;
 
 public class Selector(Server server)
 {
-    private readonly ConcurrentDictionary<Socket, List<TaskRead>> _readTasks = new ConcurrentDictionary<Socket, List<TaskRead>>();
-    private readonly ConcurrentDictionary<Socket, List<TaskWrite>> _writeTasks = new ConcurrentDictionary<Socket, List<TaskWrite>>();
+    private readonly ConcurrentDictionary<Socket, List<TaskRead>> _readTasks = new();
+    private readonly ConcurrentDictionary<Socket, List<TaskWrite>> _writeTasks = new();
     private readonly Server _server = server;
     
     private bool _isRunning = true;
 
     public void AddTaskRead(Socket socket, TaskRead task)
     {
+        if (!_isRunning)
+        {
+            task.Tcs.SetResult(0);
+            return;
+        }
         if (_readTasks.TryGetValue(socket, out var readTask))
         {
             readTask.Add(task);
@@ -28,6 +33,11 @@ public class Selector(Server server)
 
     public void AddTaskWrite(Socket socket, TaskWrite task)
     {
+        if (!_isRunning)
+        {
+            task.Tcs.SetResult(0);
+            return;
+        }
         if (_writeTasks.TryGetValue(socket, out var writeTask))
         {
             writeTask.Add(task);
@@ -100,6 +110,22 @@ public class Selector(Server server)
                 _writeTasks.TryRemove(socket, out _);
             }
         }
+
+        foreach (var readTasksList in _readTasks.Values)
+        {
+            foreach (var readTask in readTasksList)
+            {
+                readTask.Tcs.SetResult(0);
+            }
+        }
+
+        foreach (var writeTasksList in _writeTasks.Values)
+        {
+            foreach (var writeTask in writeTasksList)
+            {
+                writeTask.Tcs.SetResult(0);
+            }
+        }
     }
 
     public void Stop()
@@ -113,7 +139,7 @@ public class Selector(Server server)
         {
             foreach (var taskRead in readList)
             {
-                taskRead.Tcs.TrySetResult(0);
+                taskRead.Tcs.SetResult(0);
             }
             readList.Clear();
         }
@@ -122,7 +148,7 @@ public class Selector(Server server)
         {
             foreach (var taskWrite in writeList)
             {
-                taskWrite.Tcs.TrySetResult(0);
+                taskWrite.Tcs.SetResult(0);
             }
             writeList.Clear();
         }

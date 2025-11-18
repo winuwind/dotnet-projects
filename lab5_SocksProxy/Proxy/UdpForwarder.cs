@@ -17,7 +17,7 @@ public class UdpForwarder(Server server, Handler handler, Socket socket, IPAddre
     public void Close()
     {
         _isRunning = false;
-        
+
         socket.Close();
         socket.Dispose();
         
@@ -75,16 +75,9 @@ public class UdpForwarder(Server server, Handler handler, Socket socket, IPAddre
     
     public Task Work()
     {
-        var thread1 = new Thread(() =>
-        {
-            ForwardUdp(AddressFamily.InterNetwork).GetAwaiter().GetResult();
-        });
-        thread1.Start();
-        var thread2 = new Thread(() =>
-        {
-            ForwardUdp(AddressFamily.InterNetworkV6).GetAwaiter().GetResult();
-        });
-        thread2.Start();
+        
+        _ = Task.Run(async () => await ForwardUdp(AddressFamily.InterNetwork));
+        _ = Task.Run(async () => await ForwardUdp(AddressFamily.InterNetworkV6));
         return Task.CompletedTask;
     }
 

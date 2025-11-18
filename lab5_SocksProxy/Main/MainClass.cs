@@ -64,6 +64,11 @@ public class MainClass
                     case "exit": server.Stop(); return;
                 }
             }
+            else
+            {
+                server.Stop();
+                return;
+            }
         }
     }
 }
