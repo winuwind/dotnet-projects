@@ -33,14 +33,14 @@ public class UdpForwarder(Server server, Handler handler, Socket socket, IPAddre
         var localEndPoint = (IPEndPoint?) _socketDest.LocalEndPoint;
         
         var sizeBytes = 0;
-        bytes[1] = 0x00;
+        bytes[1] = AppConstant.Success;
         
         if (localEndPoint?.AddressFamily == AddressFamily.InterNetwork)
         {
             _addressUdpClient = localEndPoint.Address;
             _portUdpClient = localEndPoint.Port;
             
-            bytes[3] = 0x01;
+            bytes[3] = AppConstant.Ipv4Command;
             localEndPoint.Address.GetAddressBytes().CopyTo(bytes, 4);
             BitConverter.GetBytes(IPAddress.HostToNetworkOrder((short) localEndPoint.Port)).CopyTo(bytes, 8);
             sizeBytes = 10;
@@ -50,15 +50,15 @@ public class UdpForwarder(Server server, Handler handler, Socket socket, IPAddre
             _addressUdpClient = localEndPoint.Address;
             _portUdpClient = localEndPoint.Port;
             
-            bytes[3] = 0x04;
+            bytes[3] = AppConstant.Ipv6Command;
             localEndPoint.Address.GetAddressBytes().CopyTo(bytes, 4);
             BitConverter.GetBytes(IPAddress.HostToNetworkOrder((short) localEndPoint.Port)).CopyTo(bytes, 20);
             sizeBytes = 22;
         }
         else
         {
-            bytes[1] = 0x01;
-            bytes[3] = 0x01; bytes[4] = 0x00; bytes[5] = 0x00; bytes[6] = 0x00; bytes[7] = 0x00; bytes[8] = 0x00; bytes[9] = 0x00;
+            bytes[1] = AppConstant.ServerError;
+            bytes[3] = AppConstant.Ipv4Command; bytes[4] = 0x00; bytes[5] = 0x00; bytes[6] = 0x00; bytes[7] = 0x00; bytes[8] = 0x00; bytes[9] = 0x00;
             await server.Send(socket, bytes, 0, 10, null);
             Close();
             handler.CloseConnection();
@@ -107,7 +107,7 @@ public class UdpForwarder(Server server, Handler handler, Socket socket, IPAddre
             
             if (remote.Address.Equals(_addressUdpClient))
             {
-                if (bytes[0] != 0x00 || bytes[1] != 0x00 || bytes[2] != 0x00)
+                if (bytes[0] != AppConstant.ReservedByte || bytes[1] != AppConstant.ReservedByte || bytes[2] != AppConstant.NoFragmentation)
                 {
                     continue;
                 }
@@ -117,15 +117,15 @@ public class UdpForwarder(Server server, Handler handler, Socket socket, IPAddre
                     var addr = completed.Result;
                     
                     var index = 4;
-                    if (bytes[3] == 0x01)
+                    if (bytes[3] == AppConstant.Ipv4Command)
                     {
                         index += 4;
                     }
-                    else if (bytes[3] == 0x03)
+                    else if (bytes[3] == AppConstant.DnsCommand)
                     {
                         index += bytes[4] + 1;
                     }
-                    else if (bytes[3] == 0x04)
+                    else if (bytes[3] == AppConstant.Ipv6Command)
                     {
                         index += 16;
                     }
@@ -140,14 +140,14 @@ public class UdpForwarder(Server server, Handler handler, Socket socket, IPAddre
             else
             {
                 var heads = new byte[4];
-                heads[0] = 0x00; 
-                heads[1] = 0x00;
-                heads[2] = 0x00;
-                heads[3] = 0x01;
+                heads[0] = AppConstant.ReservedByte; 
+                heads[1] = AppConstant.ReservedByte;
+                heads[2] = AppConstant.NoFragmentation;
+                heads[3] = AppConstant.Ipv4Command;
 
                 if (remote.AddressFamily == AddressFamily.InterNetworkV6)
                 {
-                    heads[3] = 0x04;
+                    heads[3] = AppConstant.Ipv6Command;
                 }
 
                 var addr = remote.Address.GetAddressBytes();

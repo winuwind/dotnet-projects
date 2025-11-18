@@ -3,6 +3,7 @@ using System.Net;
 using System.Net.Sockets;
 using System.Text;
 using DnsClient;
+using SOCKS_Proxy.Proxy;
 
 namespace SOCKS_Proxy.Control;
 
@@ -102,13 +103,13 @@ public class Server
     {
         var type = bytes[3];
         IPAddress addr;
-        if (type == 0x01)
+        if (type == AppConstant.Ipv4Command)
         {
             var addressFourBytes = new byte[4];
             Array.Copy(bytes, 4, addressFourBytes, 0, 4);
             addr = new IPAddress(addressFourBytes);
         }
-        else if (type == 0x03)
+        else if (type == AppConstant.DnsCommand)
         {
             var length = bytes[4];
             var host = Encoding.ASCII.GetString(bytes, 5, length);
@@ -127,7 +128,7 @@ public class Server
                 throw new Exception(e.Message);
             }
         }
-        else if (type == 0x04)
+        else if (type == AppConstant.Ipv6Command)
         {
             var addressSixteenBytes = new byte[16];
             Array.Copy(bytes, 4, addressSixteenBytes, 0, 16);
@@ -193,12 +194,12 @@ public class Server
         var number = bytes[1];
         for (var i = 2; i < number + 2; i++)
         {
-            if (bytes[i] == 0x00)
+            if (bytes[i] == AppConstant.NoAuth)
             {
-                return 0x00;
+                return AppConstant.NoAuth;
             }
         }
-        return 0xFF;
+        return AppConstant.NoMethodsAuthAvailable;
     }
 
     public Task<int> Send(Socket socket, byte[] buffer, int offset, int count, IPEndPoint? endPoint)

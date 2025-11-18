@@ -35,20 +35,20 @@ public class TcpForwarder(Server server, Handler handler, Socket socket, IPAddre
         }
         catch (SocketException ex)
         {
-            bytes[3] = 0x01; bytes[4] = 0x00; bytes[5] = 0x00; bytes[6] = 0x00; bytes[7] = 0x00; bytes[8] = 0x00; bytes[9] = 0x00;
+            bytes[3] = AppConstant.Ipv4Command; bytes[4] = 0x00; bytes[5] = 0x00; bytes[6] = 0x00; bytes[7] = 0x00; bytes[8] = 0x00; bytes[9] = 0x00;
             switch (ex.SocketErrorCode)
             {
                 case SocketError.NetworkUnreachable:
-                    bytes[1] = 0x03;
+                    bytes[1] = AppConstant.NetworkUnreachable;
                     break;
                 case SocketError.HostUnreachable:
-                    bytes[1] = 0x04;
+                    bytes[1] = AppConstant.HostUnreachable;
                     break;
                 case SocketError.ConnectionRefused:
-                    bytes[1] = 0x05;
+                    bytes[1] = AppConstant.ConnectionRefused;
                     break;
                 default:
-                    bytes[1] = 0x01;
+                    bytes[1] = AppConstant.ServerError;
                     break;
             }
             await MyServer.Send(SocketSource, bytes, 0, 10, null);
@@ -58,28 +58,28 @@ public class TcpForwarder(Server server, Handler handler, Socket socket, IPAddre
         }
 
         var sizeBytes = 0;
-        bytes[0] = 0x05;
-        bytes[1] = 0x00;
-        bytes[2] = 0x00;
+        bytes[0] = AppConstant.SocksVersion;
+        bytes[1] = AppConstant.Success;
+        bytes[2] = AppConstant.ReservedByte;
         var endPoint = (IPEndPoint?) SocketDest.LocalEndPoint;
         if (endPoint?.AddressFamily == AddressFamily.InterNetwork)
         {
-            bytes[3] = 0x01;
+            bytes[3] = AppConstant.Ipv4Command;
             endPoint.Address.GetAddressBytes().CopyTo(bytes, 4);
             BitConverter.GetBytes(IPAddress.HostToNetworkOrder((short) endPoint.Port)).CopyTo(bytes, 8);
             sizeBytes = 10;
         }
         else if (endPoint?.AddressFamily == AddressFamily.InterNetworkV6)
         {
-            bytes[3] = 0x04;
+            bytes[3] = AppConstant.Ipv6Command;
             endPoint.Address.GetAddressBytes().CopyTo(bytes, 4);
             BitConverter.GetBytes(IPAddress.HostToNetworkOrder((short) endPoint.Port)).CopyTo(bytes, 20);
             sizeBytes = 22;
         }
         else
         {
-            bytes[1] = 0x01;
-            bytes[3] = 0x01; bytes[4] = 0x00; bytes[5] = 0x00; bytes[6] = 0x00; bytes[7] = 0x00; bytes[8] = 0x00; bytes[9] = 0x00;
+            bytes[1] = AppConstant.ServerError;
+            bytes[3] = AppConstant.Ipv4Command; bytes[4] = 0x00; bytes[5] = 0x00; bytes[6] = 0x00; bytes[7] = 0x00; bytes[8] = 0x00; bytes[9] = 0x00;
             await MyServer.Send(SocketSource, bytes, 0, 10, null);
             Close();
             Handler.CloseConnection();

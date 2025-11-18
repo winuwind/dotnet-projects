@@ -32,26 +32,26 @@ public class ConnectionListener : TcpForwarder, IProxy
     public new async Task Init(IPAddress address, uint port, byte[] bytes)
     {
         var sizeBytes = 0;
-        bytes[1] = 0x00;
+        bytes[1] = AppConstant.Success;
         var endPoint = (IPEndPoint?) SocketDest.LocalEndPoint;
         if (endPoint?.AddressFamily == AddressFamily.InterNetwork)
         {
-            bytes[3] = 0x01;
+            bytes[3] = AppConstant.Ipv4Command;
             endPoint.Address.GetAddressBytes().CopyTo(bytes, 4);
             BitConverter.GetBytes(IPAddress.HostToNetworkOrder((short) endPoint.Port)).CopyTo(bytes, 8);
             sizeBytes = 10;
         }
         else if (endPoint?.AddressFamily == AddressFamily.InterNetworkV6)
         {
-            bytes[3] = 0x04;
+            bytes[3] = AppConstant.Ipv6Command;
             endPoint.Address.GetAddressBytes().CopyTo(bytes, 4);
             BitConverter.GetBytes(IPAddress.HostToNetworkOrder((short) endPoint.Port)).CopyTo(bytes, 20);
             sizeBytes = 22;
         }
         else
         {
-            bytes[1] = 0x01;
-            bytes[3] = 0x01; bytes[4] = 0x00; bytes[5] = 0x00; bytes[6] = 0x00; bytes[7] = 0x00; bytes[8] = 0x00; bytes[9] = 0x00;
+            bytes[1] = AppConstant.ServerError;
+            bytes[3] = AppConstant.Ipv4Command; bytes[4] = 0x00; bytes[5] = 0x00; bytes[6] = 0x00; bytes[7] = 0x00; bytes[8] = 0x00; bytes[9] = 0x00;
             await MyServer.Send(SocketSource, bytes, 0, 10, null);
             Close();
             Handler.CloseConnection();
@@ -71,31 +71,31 @@ public class ConnectionListener : TcpForwarder, IProxy
         _socket = await SocketDest.AcceptAsync();
         
         var bytes = new byte[22];
-        bytes[0] = 0x05; 
-        bytes[1] = 0x00;
-        bytes[2] = 0x00;
+        bytes[0] = AppConstant.SocksVersion; 
+        bytes[1] = AppConstant.Success;
+        bytes[2] = AppConstant.ReservedByte;
         
         var remote = (IPEndPoint?) _socket.RemoteEndPoint;
         var sizeBytes = 0;
         
         if (remote?.AddressFamily == AddressFamily.InterNetwork)
         {
-            bytes[3] = 0x01;
+            bytes[3] = AppConstant.Ipv4Command;
             remote.Address.GetAddressBytes().CopyTo(bytes, 4);
             BitConverter.GetBytes(IPAddress.HostToNetworkOrder((short) remote.Port)).CopyTo(bytes, 8);
             sizeBytes = 10;
         }
         else if (remote?.AddressFamily == AddressFamily.InterNetworkV6)
         {
-            bytes[3] = 0x04;
+            bytes[3] = AppConstant.Ipv4Command;
             remote.Address.GetAddressBytes().CopyTo(bytes, 4);
             BitConverter.GetBytes(IPAddress.HostToNetworkOrder((short) remote.Port)).CopyTo(bytes, 20);
             sizeBytes = 22;
         }
         else
         {
-            bytes[1] = 0x01;
-            bytes[3] = 0x01; bytes[4] = 0x00; bytes[5] = 0x00; bytes[6] = 0x00; bytes[7] = 0x00; bytes[8] = 0x00; bytes[9] = 0x00;
+            bytes[1] = AppConstant.ServerError;
+            bytes[3] = AppConstant.Ipv4Command; bytes[4] = 0x00; bytes[5] = 0x00; bytes[6] = 0x00; bytes[7] = 0x00; bytes[8] = 0x00; bytes[9] = 0x00;
             await MyServer.Send(SocketSource, bytes, 0, 10, null);
             Close();
             Handler.CloseConnection();
