@@ -4,6 +4,9 @@ using System.Net.Sockets;
 using System.Text;
 using DnsClient;
 using SOCKS_Proxy.Proxy;
+using Serilog;
+
+
 
 namespace SOCKS_Proxy.Control;
 
@@ -24,6 +27,12 @@ public class Server
 
     public Server(int port)
     {
+        Log.Logger = new LoggerConfiguration()
+            .WriteTo.Console()
+            .WriteTo.File("server.log", rollingInterval: RollingInterval.Day)
+            .CreateLogger();
+
+        
         _selector = new Selector(this);
         
         var dns = new LookupClient();
@@ -49,6 +58,7 @@ public class Server
         }
         else
         {
+            Log.Warning("Server: Socket hasn't LocalEndPoint");
             _port = port;
         }
 
@@ -73,6 +83,7 @@ public class Server
                 }
             }
         }
+        
         Console.WriteLine(sb);
     }
 
@@ -103,18 +114,18 @@ public class Server
 
     public async Task<IPAddress> ParseAddress(byte[] bytes)
     {
-        var type = bytes[3];
+        var type = bytes[AppConstant.IndexTypeAddress];
         IPAddress addr;
         if (type == AppConstant.Ipv4Command)
         {
             var addressFourBytes = new byte[4];
-            Array.Copy(bytes, 4, addressFourBytes, 0, 4);
+            Array.Copy(bytes, AppConstant.IndexAddress, addressFourBytes, 0, 4);
             addr = new IPAddress(addressFourBytes);
         }
         else if (type == AppConstant.DnsCommand)
         {
-            var length = bytes[4];
-            var host = Encoding.ASCII.GetString(bytes, 5, length);
+            var length = bytes[AppConstant.IndexAddress];
+            var host = Encoding.ASCII.GetString(bytes, AppConstant.IndexAddress + 1, length);
             host = host.TrimEnd('\0');
             
             try
@@ -133,7 +144,7 @@ public class Server
         else if (type == AppConstant.Ipv6Command)
         {
             var addressSixteenBytes = new byte[16];
-            Array.Copy(bytes, 4, addressSixteenBytes, 0, 16);
+            Array.Copy(bytes, AppConstant.IndexAddress, addressSixteenBytes, 0, 16);
             addr = new IPAddress(addressSixteenBytes);
         }
         else
@@ -148,7 +159,11 @@ public class Server
     {
         var clientSocket = _socket.Accept();
         var handler = new Handler(clientSocket, this);
-        _clients.Add(handler);
+
+        lock (_lock)
+        {
+            _clients.Add(handler);
+        }
 
         _ = Task.Run(async () =>
         {
@@ -167,8 +182,12 @@ public class Server
     {
         _isRunning = false;
         _selector.Stop();
-        
-        var clientsCopy = _clients.ToArray();
+
+        Handler[] clientsCopy;
+        lock (_lock)
+        {
+            clientsCopy = _clients.ToArray();
+        }
         
         foreach (var handler in clientsCopy)
         {
@@ -177,11 +196,22 @@ public class Server
         
         _cts.Cancel();
         
-        _socket.Close();
-        _socket.Dispose();
-
-        _socketDns.Close();
-        _socketDns.Dispose();
+        try
+        {
+            _socket.Close();
+        }
+        catch(Exception e)
+        {
+            Log.Warning("Server.Stop(): error when closed _socket: " + e.Message);
+        }
+        try
+        {
+            _socketDns.Close();
+        }
+        catch(Exception e)
+        {
+            Log.Warning("Server.Stop(): error when closed _socketDns: " + e.Message);
+        }
     }
 
     public void DeleteClient(Handler handler)
@@ -235,7 +265,7 @@ public class Server
     
     private async Task DnsListenLoop()
     {
-        var buffer = new byte[512];
+        var buffer = new byte[AppConstant.SizeBuffer];
         while (_isRunning)
         {
             try
@@ -243,11 +273,20 @@ public class Server
                 var result = await _socketDns.ReceiveAsync(buffer, SocketFlags.None, _cts.Token);
                 var response = buffer[..result];
                 var transactionId = (short)((response[0] << 8) | response[1]);
-                var ip = ParseDnsResponse(response);
-
-                if (_pendingDns.TryRemove(transactionId, out var tcs))
+                try
                 {
-                    tcs.SetResult(ip);
+                    var ip = ParseDnsResponse(response);
+                    if (_pendingDns.TryRemove(transactionId, out var tcs))
+                    {
+                        tcs.SetResult(ip);
+                    }
+                }
+                catch
+                {
+                    if (_pendingDns.TryRemove(transactionId, out var tcs))
+                    {
+                        tcs.SetException(new DnsResponseException());
+                    }
                 }
             }
             catch
@@ -258,7 +297,7 @@ public class Server
 
         foreach (var tcs in _pendingDns.Values)
         {
-            tcs.SetResult(IPAddress.Any);
+            tcs.SetException(new DnsResponseException());
         }
     }
 
@@ -371,6 +410,14 @@ public class Server
         var request = BuildDnsRequest(hostName, transactionId);
         await _socketDns.SendAsync(request, SocketFlags.None, _cts.Token);
 
+        var delayTask = Task.Delay(AppConstant.Timeout);
+        var completed = await Task.WhenAny(tcs.Task, delayTask);
+        
+        if (completed == delayTask)
+        {
+            throw new TimeoutException();
+        }
+        
         return await tcs.Task;
     }
 }

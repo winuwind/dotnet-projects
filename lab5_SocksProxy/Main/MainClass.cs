@@ -5,7 +5,7 @@ namespace SOCKS_Proxy.Main;
 
 public class MainClass
 {
-    private static bool IsWorking = true;
+    private static bool _isWorking = true;
     
     public static void Main(string[] args)
     {
@@ -18,7 +18,7 @@ public class MainClass
         
         Console.CancelKeyPress += (_, e) =>
         {
-            IsWorking = false;
+            _isWorking = false;
             e.Cancel = true;
             server.Stop();
         };
@@ -43,7 +43,7 @@ public class MainClass
     
     private static void ReadCommands(Server server)
     {
-        while (IsWorking)
+        while (_isWorking)
         {
             var str = Console.ReadLine();
             if (str != null)

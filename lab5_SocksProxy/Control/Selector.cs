@@ -5,8 +5,8 @@ namespace SOCKS_Proxy.Control;
 
 public class Selector(Server server)
 {
-    private readonly ConcurrentDictionary<Socket, List<TaskRead>> _readTasks = new();
-    private readonly ConcurrentDictionary<Socket, List<TaskWrite>> _writeTasks = new();
+    private readonly ConcurrentDictionary<Socket, ConcurrentQueue<TaskRead>> _readTasks = new();
+    private readonly ConcurrentDictionary<Socket, ConcurrentQueue<TaskWrite>> _writeTasks = new();
     private readonly Server _server = server;
     
     private bool _isRunning = true;
@@ -20,14 +20,12 @@ public class Selector(Server server)
         }
         if (_readTasks.TryGetValue(socket, out var readTask))
         {
-            readTask.Add(task);
+            readTask.Enqueue(task);
         }
         else
         {
-            _readTasks[socket] =
-            [
-                task
-            ];
+            _readTasks[socket] = new ConcurrentQueue<TaskRead>();
+            _readTasks[socket].Enqueue(task);
         }
     }
 
@@ -40,14 +38,12 @@ public class Selector(Server server)
         }
         if (_writeTasks.TryGetValue(socket, out var writeTask))
         {
-            writeTask.Add(task);
+            writeTask.Enqueue(task);
         }
         else
         {
-            _writeTasks[socket] =
-            [
-                task
-            ];
+            _writeTasks[socket] = new ConcurrentQueue<TaskWrite>();
+            _writeTasks[socket].Enqueue(task);
         }
     }
 
@@ -162,54 +158,49 @@ public class Selector(Server server)
             return;
         }
         
-        var task = _readTasks[socket][0];
-        var bytesRead = 0;
+        if (_readTasks[socket].TryPeek(out var task))
+        {
+            var bytesRead = 0;
         
-        try
-        {
-            if (task.EndPoint != null)
+            try
             {
-                bytesRead = socket.ReceiveFrom(task.Buffer, task.Offset, task.Count, SocketFlags.None, ref task.EndPoint);
-            }
-            else
-            {
-                bytesRead = socket.Receive(task.Buffer, task.Offset, task.Count, SocketFlags.None);
-            }
-        }
-        catch
-        {
-            bytesRead = 0;
-        }
-        finally
-        {
-            task.Count -= bytesRead;
-            if (task.Count > 0 && task.FlagNeedFull && bytesRead > 0)
-            {
-                task.Offset += bytesRead;
-            }
-            else
-            {
-                try
+                if (task.EndPoint != null)
                 {
-                    _readTasks[socket].RemoveAt(0);
-                }
-                catch
-                {
-                    //
-                }
-                if (bytesRead <= 0)
-                {
-                    CloseSocket(socket);
-                    _readTasks.TryRemove(socket, out _);
-                }
-                else if (_readTasks[socket].Count == 0)
-                {
-                    _readTasks.TryRemove(socket, out _);
-                    task.Tcs.SetResult(bytesRead);
+                    bytesRead = socket.ReceiveFrom(task.Buffer, task.Offset, task.Count, SocketFlags.None, ref task.EndPoint);
                 }
                 else
                 {
-                    task.Tcs.SetResult(bytesRead);
+                    bytesRead = socket.Receive(task.Buffer, task.Offset, task.Count, SocketFlags.None);
+                }
+            }
+            catch
+            {
+                bytesRead = 0;
+            }
+            finally
+            {
+                task.Count -= bytesRead;
+                if (task.Count > 0 && task.FlagNeedFull && bytesRead > 0)
+                {
+                    task.Offset += bytesRead;
+                }
+                else
+                {
+                    _readTasks[socket].TryDequeue(out _);
+                    if (bytesRead <= 0)
+                    {
+                        CloseSocket(socket);
+                        _readTasks.TryRemove(socket, out _);
+                    }
+                    else if (_readTasks[socket].Count == 0)
+                    {
+                        _readTasks.TryRemove(socket, out _);
+                        task.Tcs.SetResult(bytesRead);
+                    }
+                    else
+                    {
+                        task.Tcs.SetResult(bytesRead);
+                    }
                 }
             }
         }
@@ -224,54 +215,50 @@ public class Selector(Server server)
             return;
         }
         
-        var task = _writeTasks[socket][0];
-        var bytesSend = 0;
-        try
+        if (_writeTasks[socket].TryPeek(out var task))
         {
-            if (task.EndPoint != null)
+            var bytesSend = 0;
+            try
             {
-                bytesSend = socket.SendTo(task.Buffer, task.Offset, task.Count, SocketFlags.None, task.EndPoint);
-            }
-            else
-            {
-                bytesSend = socket.Send(task.Buffer, task.Offset, task.Count, SocketFlags.None);
-            }
-        }
-        catch
-        {
-            bytesSend = 0;
-        }
-        finally
-        {
-            task.Count -= bytesSend;
-            if (task.Count > 0 && bytesSend > 0)
-            {
-                task.Offset += bytesSend;
-            }
-            else
-            {
-                try
+                if (task.EndPoint != null)
                 {
-                    _writeTasks[socket].RemoveAt(0);
-                }
-                catch
-                {
-                    //
-                }
-                if (bytesSend <= 0)
-                {
-                    CloseSocket(socket);
-                    _writeTasks.TryRemove(socket, out _);
-                }
-
-                else if (_writeTasks[socket].Count == 0)
-                {
-                    _writeTasks.TryRemove(socket, out _);
-                    task.Tcs.SetResult(bytesSend);
+                    bytesSend = socket.SendTo(task.Buffer, task.Offset, task.Count, SocketFlags.None, task.EndPoint);
                 }
                 else
                 {
-                    task.Tcs.SetResult(bytesSend);
+                    bytesSend = socket.Send(task.Buffer, task.Offset, task.Count, SocketFlags.None);
+                }
+            }
+            catch
+            {
+                bytesSend = 0;
+            }
+            finally
+            {
+                task.Count -= bytesSend;
+                if (task.Count > 0 && bytesSend > 0)
+                {
+                    task.Offset += bytesSend;
+                }
+                else
+                {
+                    _writeTasks[socket].TryDequeue(out _);
+
+                    if (bytesSend <= 0)
+                    {
+                        CloseSocket(socket);
+                        _writeTasks.TryRemove(socket, out _);
+                    }
+
+                    else if (_writeTasks[socket].Count == 0)
+                    {
+                        _writeTasks.TryRemove(socket, out _);
+                        task.Tcs.SetResult(bytesSend);
+                    }
+                    else
+                    {
+                        task.Tcs.SetResult(bytesSend);
+                    }
                 }
             }
         }

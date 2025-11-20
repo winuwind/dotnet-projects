@@ -1,6 +1,6 @@
 ﻿using System.Net;
 using System.Net.Sockets;
-
+using Serilog;
 using SOCKS_Proxy.Control;
 
 namespace SOCKS_Proxy.Proxy;
@@ -11,17 +11,27 @@ public class TcpForwarder(Server server, Handler handler, Socket socket, IPAddre
     protected readonly Server MyServer = server;
     protected readonly Socket SocketSource = socket;
     protected readonly Handler Handler = handler;
-    
     protected readonly Socket SocketDest = new(address.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
     
     protected bool IsRunning = true;
 
     public void Close()
     {
+        if (!IsRunning)
+        {
+            return;
+        }
+        
         IsRunning = false;
-
-        SocketDest.Close();
-        SocketDest.Dispose();
+        try
+        {
+            SocketDest.Close();
+        }
+        catch(Exception e)
+        {
+            Log.Warning("TcpFprwarder.Close(): error when closed SocketDest: " + e.Message);
+        }
+        Handler.CloseConnection();
     }
 
     public async Task Init(IPAddress address, uint port, byte[] bytes)
@@ -32,62 +42,59 @@ public class TcpForwarder(Server server, Handler handler, Socket socket, IPAddre
         }
         catch (SocketException ex)
         {
-            bytes[3] = AppConstant.Ipv4Command; bytes[4] = 0x00; bytes[5] = 0x00; bytes[6] = 0x00; bytes[7] = 0x00; bytes[8] = 0x00; bytes[9] = 0x00;
+            bytes[AppConstant.IndexTypeAddress] = AppConstant.Ipv4Command;
             switch (ex.SocketErrorCode)
             {
                 case SocketError.NetworkUnreachable:
-                    bytes[1] = AppConstant.NetworkUnreachable;
+                    bytes[AppConstant.IndexErrorType] = AppConstant.NetworkUnreachable;
                     break;
                 case SocketError.HostUnreachable:
-                    bytes[1] = AppConstant.HostUnreachable;
+                    bytes[AppConstant.IndexErrorType] = AppConstant.HostUnreachable;
                     break;
                 case SocketError.ConnectionRefused:
-                    bytes[1] = AppConstant.ConnectionRefused;
+                    bytes[AppConstant.IndexErrorType] = AppConstant.ConnectionRefused;
                     break;
                 default:
-                    bytes[1] = AppConstant.ServerError;
+                    bytes[AppConstant.IndexErrorType] = AppConstant.ServerError;
                     break;
             }
-            await MyServer.Send(SocketSource, bytes, 0, 10, null);
+            await MyServer.Send(SocketSource, bytes, AppConstant.IndexVersion, 10, null);
             Close();
-            Handler.CloseConnection();
             return;
         }
 
         var sizeBytes = 0;
-        bytes[0] = AppConstant.SocksVersion;
-        bytes[1] = AppConstant.Success;
-        bytes[2] = AppConstant.ReservedByte;
+        bytes[AppConstant.IndexVersion] = AppConstant.SocksVersion;
+        bytes[AppConstant.IndexErrorType] = AppConstant.Success;
+        bytes[AppConstant.IndexReserved] = AppConstant.ReservedByte;
         var endPoint = (IPEndPoint?) SocketDest.LocalEndPoint;
         if (endPoint?.AddressFamily == AddressFamily.InterNetwork)
         {
-            bytes[3] = AppConstant.Ipv4Command;
-            endPoint.Address.GetAddressBytes().CopyTo(bytes, 4);
-            BitConverter.GetBytes(IPAddress.HostToNetworkOrder((short) endPoint.Port)).CopyTo(bytes, 8);
+            bytes[AppConstant.IndexTypeAddress] = AppConstant.Ipv4Command;
+            endPoint.Address.GetAddressBytes().CopyTo(bytes, AppConstant.IndexAddress);
+            BitConverter.GetBytes(IPAddress.HostToNetworkOrder((short) endPoint.Port)).CopyTo(bytes, AppConstant.IndexAddress + 4);
             sizeBytes = 10;
         }
         else if (endPoint?.AddressFamily == AddressFamily.InterNetworkV6)
         {
-            bytes[3] = AppConstant.Ipv6Command;
-            endPoint.Address.GetAddressBytes().CopyTo(bytes, 4);
-            BitConverter.GetBytes(IPAddress.HostToNetworkOrder((short) endPoint.Port)).CopyTo(bytes, 20);
+            bytes[AppConstant.IndexTypeAddress] = AppConstant.Ipv6Command;
+            endPoint.Address.GetAddressBytes().CopyTo(bytes, AppConstant.IndexAddress);
+            BitConverter.GetBytes(IPAddress.HostToNetworkOrder((short) endPoint.Port)).CopyTo(bytes, AppConstant.IndexAddress + 16);
             sizeBytes = 22;
         }
         else
         {
-            bytes[1] = AppConstant.ServerError;
-            bytes[3] = AppConstant.Ipv4Command; bytes[4] = 0x00; bytes[5] = 0x00; bytes[6] = 0x00; bytes[7] = 0x00; bytes[8] = 0x00; bytes[9] = 0x00;
-            await MyServer.Send(SocketSource, bytes, 0, 10, null);
+            bytes[AppConstant.IndexErrorType] = AppConstant.ServerError;
+            bytes[AppConstant.IndexErrorType] = AppConstant.Ipv4Command;
+            await MyServer.Send(SocketSource, bytes, AppConstant.IndexVersion, 10, null);
             Close();
-            Handler.CloseConnection();
             return;
         }
 
-        var bytesSend = await MyServer.Send(SocketSource, bytes, 0, sizeBytes, null);
+        var bytesSend = await MyServer.Send(SocketSource, bytes, AppConstant.IndexVersion, sizeBytes, null);
         if (bytesSend <= 0)
         {
             Close();
-            Handler.CloseConnection();
         }
     }
 
@@ -100,7 +107,7 @@ public class TcpForwarder(Server server, Handler handler, Socket socket, IPAddre
 
     protected async Task ForwardTcp(Socket socketFirst, Socket socketSecond)
     {
-        var buffer = new byte[4096];
+        var buffer = new byte[AppConstant.SizeBuffer];
 
         while (IsRunning)
         {
@@ -109,7 +116,6 @@ public class TcpForwarder(Server server, Handler handler, Socket socket, IPAddre
             if (bytesRead <= 0)
             {
                 Close();
-                Handler.CloseConnection();
                 return;
             }
             await MyServer.Send(socketSecond, buffer, 0, bytesRead, null);

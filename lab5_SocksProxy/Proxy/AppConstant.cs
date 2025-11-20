@@ -26,4 +26,22 @@ public static class AppConstant
     public const byte UnknownAddressType = 0x08;
     
     public const byte NoFragmentation = 0x00;
+    
+    public const int MaxSizeUdpDGram = 65536;
+    public const int SizeBuffer = 4096;
+
+    public const int Timeout = 500;
+
+    public const int IndexVersion = 0;
+    public const int IndexCommand = 1;
+    public const int IndexReserved = 2;
+    public const int IndexTypeAddress = 3;
+    public const int IndexAddress = 4;
+    public const int IndexNumberMethods = 1;
+    public const int IndexMethod = 1;
+    public const int IndexErrorType = 1;
+    public const int IndexPort = 200;
+    public const int IndexUdpFirstReserved = 0;
+    public const int IndexUdpSecondReserved = 1;
+    public const int IndexUdpFragmentation = 2;
 }
