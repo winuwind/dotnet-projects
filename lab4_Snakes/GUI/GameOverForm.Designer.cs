@@ -1,8 +1,8 @@
 ﻿using System.ComponentModel;
 
-namespace SnakeGame.GUI;
+namespace Snake.GUI;
 
-partial class ChooseRoleForm
+partial class GameOverForm
 {
     /// <summary>
     /// Required designer variable.
@@ -34,7 +34,7 @@ partial class ChooseRoleForm
         this.components = new System.ComponentModel.Container();
         this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
         this.ClientSize = new System.Drawing.Size(800, 450);
-        this.Text = "ChooseRoleForm";
+        this.Text = "GameOverForm";
     }
 
     #endregion

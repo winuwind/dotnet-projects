@@ -1,5 +1,4 @@
-﻿using System.ComponentModel;
-using Snakes;
+﻿using Snakes;
 
 namespace Snake.Game.Field;
 
@@ -29,20 +28,12 @@ public class FieldGame
        }
     }
 
-    public FieldGame(FieldGame other)
-    {
-        _sizeStruct = other._sizeStruct;
-        _size = other._size;
-        _field = other._field.ToArray();
-        _countFreeCells = other._countFreeCells;
-    }
-
     public GameState.Types.Coord GetSize()
     {
         return _sizeStruct;
     }
 
-    private CellType GetCellType(GameState.Types.Coord coordinates)
+    public CellType GetCellType(GameState.Types.Coord coordinates)
     {
         return _field[(coordinates.Y + _sizeStruct.Y) % _sizeStruct.Y * _sizeStruct.X + (coordinates.X + _sizeStruct.X) % _sizeStruct.X].Type;
     }
@@ -123,6 +114,7 @@ public class FieldGame
 
     private bool CheckSquad(GameState.Types.Coord coordinate)
     {
+        var flag = false;
         for (var i = 0; i < 5; i++)
         {
             for (var j = 0; j < 5; j++)
@@ -133,20 +125,30 @@ public class FieldGame
                     Y = coordinate.Y + j
                 };
                 var type = GetCellType(coord);
-                if ((i == 2 || j == 2) && Math.Abs(i - j) <= 1)
+                
+                if ((i == 2 || j == 2) && Math.Abs(i - j) == 1)
+                {
+                    if (type == CellType.Empty)
+                    {
+                        flag = true;
+                    }
+                }
+
+                if (i == 2 && j == 2)
                 {
                     if (type != CellType.Empty)
                     {
-                        return false;
+                        flag = false;
                     }
                 }
+                
                 if (type != CellType.Empty && type != CellType.Food)
                 {
                     return false;
                 }
             }
         }
-        return true;
+        return flag;
     }
 
     public GameState.Types.Coord? FindEmptySquad()

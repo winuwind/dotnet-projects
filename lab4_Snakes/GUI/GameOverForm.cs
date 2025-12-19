@@ -1,4 +1,4 @@
-﻿namespace SnakeGame.GUI;
+﻿namespace Snake.GUI;
 
 public partial class GameOverForm : Form
 {

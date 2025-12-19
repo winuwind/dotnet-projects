@@ -1,6 +1,6 @@
 ﻿using Snakes;
 
-namespace SnakeGame.GUI;
+namespace Snake.GUI;
 
 public partial class ChooseRoleForm : Form
 {

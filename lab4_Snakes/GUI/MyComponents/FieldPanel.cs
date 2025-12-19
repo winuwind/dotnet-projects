@@ -1,27 +1,36 @@
-﻿using Google.Protobuf.Collections;
-using Snake.Config;
+﻿using Snake.Config;
 using Snake.Control;
 using Snakes;
 
-namespace SnakeGame.GUI.MyComponents;
+namespace Snake.GUI.MyComponents;
 
 public class FieldPanel : Panel
 {
-    private readonly List<Color> _colors = [Color.BlueViolet, Color.Aqua, Color.DarkBlue, Color.LawnGreen, Color.Yellow, Color.Blue, Color.Brown, Color.DarkGreen, Color.DarkRed];
+    // private readonly List<Color> _colors = [Color.BlueViolet, Color.Aqua, Color.DarkBlue, Color.LawnGreen, Color.Yellow, Color.Blue, Color.Brown, Color.DarkGreen, Color.DarkRed];
+    private readonly List<Color> _colors =
+    [
+        Color.FromArgb(0x1F, 0x3A, 0x5F),
+        Color.FromArgb(0x00, 0x6D, 0x6F),
+        Color.FromArgb(0x2E, 0x7D, 0x32),
+        Color.FromArgb(0xC6, 0x28, 0x28),
+        Color.FromArgb(0x6A, 0x1B, 0x9A),
+        Color.FromArgb(0xEF, 0x6C, 0x00),
+        Color.FromArgb(0x45, 0x27, 0xA0),
+        Color.FromArgb(0x00, 0x4D, 0x40),
+        Color.FromArgb(0x5D, 0x40, 0x37),
+    ];
     private readonly Controller _controller;
     private readonly MainForm _mainForm;
     
     private GameState _state = new GameState();
+    private GameState.Types.Snake[] _snakes = [];
     private int _gridWidth = AppConstant.Size.X;
     private int _gridHeight = AppConstant.Size.Y;
+    private int _margin = 5;
     private float _cellSize = AppConstant.Size.X;
     private float _offsetX = AppConstant.Size.X;
     private float _offsetY = AppConstant.Size.Y;
-
-    private GameState.Types.Snake[] _snakes = [];
     private bool _gridIsDrawn = false;
-
-    private int _margin = 5;
     
     private enum SnakeTurn
     {
@@ -44,17 +53,123 @@ public class FieldPanel : Panel
         Paint += RePaintField;
     }
 
+    public void SetGameState(GameState state)
+    {
+        _state = state;
+    }
+
+    public void Reset()
+    {
+        _gridIsDrawn = false;
+    }
+
+    public void SetGridSize(int w, int h)
+    {
+        _gridWidth = w;
+        _gridHeight = h;
+        Invalidate();
+    }
+
+    public void PaintField()
+    {
+        if (InvokeRequired)
+        {
+            Invoke(new Action(PaintField));
+            return;
+        }
+        var g = CreateGraphics();
+
+        if (!_gridIsDrawn)
+        {
+            DrawGrid(this, g);
+            _gridIsDrawn = true;
+        }
+        
+        var headImg = Image.FromFile("apple.jpg");
+
+        foreach (var food in _state.Foods)
+        {
+            DrawImageInCell(g, headImg, GetCellRect(food.X, food.Y), 1f);
+        }
+
+        foreach (var snake in _snakes)
+        {
+            var point = new GameState.Types.Coord(snake.Points.First());
+            ClearCell(g, point.X, point.Y);
+            for (var i = 1; i < snake.Points.Count; i++)
+            {
+                point.X = (point.X + snake.Points[i].X + AppConstant.Size.X) % AppConstant.Size.X;
+                point.Y = (point.Y + snake.Points[i].Y + AppConstant.Size.Y) % AppConstant.Size.Y;
+                ClearCell(g, point.X, point.Y);
+            }
+        }
+        
+        foreach (var snake in _state.Snakes)
+        {
+            DrawHeadSnake(snake, g);
+            
+            var pointPrev = new GameState.Types.Coord(snake.Points.First());
+            var rect = GetCellRect(pointPrev.X, pointPrev.Y);
+            Direction directionPrev;
+            if (snake.Points[1].X > 0)
+            {
+                directionPrev = Direction.Left;
+            }
+            else if (snake.Points[1].X < 0)
+            {
+                directionPrev = Direction.Right;
+            }
+            else if (snake.Points[1].Y > 0)
+            {
+                directionPrev = Direction.Up;
+            }
+            else
+            {
+                directionPrev = Direction.Down;
+            }
+            for (var i = 2; i < snake.Points.Count; i++)
+            {
+                Direction direction;
+                if (snake.Points[i].X > 0)
+                {
+                    direction = Direction.Left;
+                }
+                else if (snake.Points[i].X < 0)
+                {
+                    direction = Direction.Right;
+                }
+                else if (snake.Points[i].Y > 0)
+                {
+                    direction = Direction.Up;
+                }
+                else
+                {
+                    direction = Direction.Down;
+                }
+
+                pointPrev.X = (pointPrev.X + snake.Points[i - 1].X + AppConstant.Size.X) % AppConstant.Size.X;
+                pointPrev.Y = (pointPrev.Y + snake.Points[i - 1].Y + AppConstant.Size.Y) % AppConstant.Size.Y;
+                rect = GetCellRect(pointPrev.X, pointPrev.Y);
+                
+                DrawPartSnake(directionPrev, direction, _colors[snake.PlayerId % _colors.Count], g, rect);
+                
+                directionPrev = direction;
+            }
+            rect = GetCellRect((pointPrev.X + snake.Points[^1].X + AppConstant.Size.X) % AppConstant.Size.X, (pointPrev.Y + snake.Points[^1].Y + AppConstant.Size.Y) % AppConstant.Size.Y);
+            DrawPartSnake(directionPrev, directionPrev, _colors[snake.PlayerId % _colors.Count], g, rect);
+        }
+
+        _snakes = _state.Snakes.ToArray();
+        
+        g.Dispose();
+    }
+
     private void Init()
     {
         Dock = DockStyle.Left;
         BackColor = Color.White;
     }
 
-    public void SetGameState(GameState state)
-    {
-        _state = state;
-    }
-    
     private RectangleF GetCellRect(int x, int y)
     {
         return new RectangleF(
@@ -88,7 +203,7 @@ public class FieldPanel : Panel
             cell.Height
         );
     }
-    
+
     private void DrawSnakeCorner(Graphics g, RectangleF cell, SnakeTurn turn, Color color)
     {
         using var brush = new SolidBrush(color);
@@ -155,7 +270,7 @@ public class FieldPanel : Panel
                 break;
         }
     }
-    
+
     private void DrawImageInCell(Graphics g, Image img, RectangleF cellRect, float margin)
     {
         var r = new RectangleF(
@@ -279,7 +394,8 @@ public class FieldPanel : Panel
             }
         }
     }
-    
+
+
     private void DrawCellLabel(Graphics g, RectangleF cell, string text)
     {
         using var sf = new StringFormat();
@@ -292,112 +408,12 @@ public class FieldPanel : Panel
         g.DrawString(text, font, brush, cell, sf);
     }
 
-    public void Reset()
-    {
-        _gridIsDrawn = false;
-    }
-
     private void RePaintField(object? sender, EventArgs e)
     {
         _gridIsDrawn = false;
         PaintField();
     }
-    
-    public void PaintField()
-    {
-        if (InvokeRequired)
-        {
-            Invoke(new Action(PaintField));
-            return;
-        }
-        // var g = e.Graphics;
-        var g = CreateGraphics();
 
-        if (!_gridIsDrawn)
-        {
-            DrawGrid(this, g);
-            _gridIsDrawn = true;
-        }
-        
-        var headImg = Image.FromFile("apple.jpg");
-
-        foreach (var food in _state.Foods)
-        {
-            DrawImageInCell(g, headImg, GetCellRect(food.X, food.Y), 1f);
-        }
-
-        foreach (var snake in _snakes)
-        {
-            var point = new GameState.Types.Coord(snake.Points.First());
-            ClearCell(g, point.X, point.Y);
-            for (var i = 1; i < snake.Points.Count; i++)
-            {
-                point.X = (point.X + snake.Points[i].X + AppConstant.Size.X) % AppConstant.Size.X;
-                point.Y = (point.Y + snake.Points[i].Y + AppConstant.Size.Y) % AppConstant.Size.Y;
-                ClearCell(g, point.X, point.Y);
-            }
-        }
-        
-        foreach (var snake in _state.Snakes)
-        {
-            DrawHeadSnake(snake, g);
-            
-            var pointPrev = new GameState.Types.Coord(snake.Points.First());
-            var rect = GetCellRect(pointPrev.X, pointPrev.Y);
-            Direction directionPrev;
-            if (snake.Points[1].X > 0)
-            {
-                directionPrev = Direction.Left;
-            }
-            else if (snake.Points[1].X < 0)
-            {
-                directionPrev = Direction.Right;
-            }
-            else if (snake.Points[1].Y > 0)
-            {
-                directionPrev = Direction.Up;
-            }
-            else
-            {
-                directionPrev = Direction.Down;
-            }
-            for (var i = 2; i < snake.Points.Count; i++)
-            {
-                Direction direction;
-                if (snake.Points[i].X > 0)
-                {
-                    direction = Direction.Left;
-                }
-                else if (snake.Points[i].X < 0)
-                {
-                    direction = Direction.Right;
-                }
-                else if (snake.Points[i].Y > 0)
-                {
-                    direction = Direction.Up;
-                }
-                else
-                {
-                    direction = Direction.Down;
-                }
-
-                pointPrev.X = (pointPrev.X + snake.Points[i - 1].X + AppConstant.Size.X) % AppConstant.Size.X;
-                pointPrev.Y = (pointPrev.Y + snake.Points[i - 1].Y + AppConstant.Size.Y) % AppConstant.Size.Y;
-                rect = GetCellRect(pointPrev.X, pointPrev.Y);
-                
-                DrawPartSnake(directionPrev, direction, _colors[snake.PlayerId % _colors.Count], g, rect);
-                
-                directionPrev = direction;
-            }
-            rect = GetCellRect((pointPrev.X + snake.Points[^1].X + AppConstant.Size.X) % AppConstant.Size.X, (pointPrev.Y + snake.Points[^1].Y + AppConstant.Size.Y) % AppConstant.Size.Y);
-            DrawPartSnake(directionPrev, directionPrev, _colors[snake.PlayerId % _colors.Count], g, rect);
-        }
-
-        _snakes = _state.Snakes.ToArray();
-        
-        g.Dispose();
-    }
-    
     private void DrawGrid(object? sender, Graphics g)
     {
         var panel = (Panel)sender!;
@@ -440,7 +456,7 @@ public class FieldPanel : Panel
             g.DrawLine(pen, _offsetX, py, _offsetX + fieldW, py);
         }
     }
-    
+
     private void ClearCell(Graphics g, int x, int y)
     {
         float cx = _offsetX + x * _cellSize;
@@ -455,13 +471,5 @@ public class FieldPanel : Panel
         {
             g.DrawRectangle(pen, cx, cy, _cellSize, _cellSize);
         }
-    }
-
-
-    public void SetGridSize(int w, int h)
-    {
-        _gridWidth = w;
-        _gridHeight = h;
-        Invalidate();
     }
 }

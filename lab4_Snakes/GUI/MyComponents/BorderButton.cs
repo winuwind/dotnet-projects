@@ -1,10 +1,9 @@
 ﻿using System.ComponentModel;
 
-namespace SnakeGame.GUI.MyComponents;
+namespace Snake.GUI.MyComponents;
 
 public sealed class BorderButton : Button
 {
-    // ---- Основные свойства ----
     [Browsable(true)]
     [DesignerSerializationVisibility(DesignerSerializationVisibility.Visible)]
     [Category("Appearance")]
@@ -15,7 +14,6 @@ public sealed class BorderButton : Button
     [Category("Appearance")]
     public int BorderThickness { get; set; } = 2;
 
-    // ---- Hover свойства ----
     [Browsable(true)]
     [DesignerSerializationVisibility(DesignerSerializationVisibility.Visible)]
     [Category("Appearance")]
@@ -33,16 +31,14 @@ public sealed class BorderButton : Button
     {
         FlatStyle = FlatStyle.Flat;
         FlatAppearance.BorderSize = 0;
-        BackColor = Color.Transparent;
-        ForeColor = Color.DarkBlue;
+        BackColor = Color.Silver;
+        ForeColor = Color.DarkViolet;
 
         SetStyle(ControlStyles.Opaque, true);
 
-        // Сохраняем исходные цвета
         _originalBorderColor = BorderColor;
         _originalForeColor = ForeColor;
 
-        // Подписываем hover события
         MouseEnter += OnHoverEnter;
         MouseLeave += OnHoverLeave;
     }
@@ -82,7 +78,7 @@ public sealed class BorderButton : Button
         get
         {
             var cp = base.CreateParams;
-            cp.ExStyle |= 0x20; // WS_EX_TRANSPARENT
+            cp.ExStyle |= 0x20;
             return cp;
         }
     }

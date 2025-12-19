@@ -1,8 +1,8 @@
 ﻿using System.ComponentModel;
 
-namespace SnakeGame.GUI;
+namespace Snake.GUI;
 
-partial class ErrorForm
+partial class ChooseValueForm
 {
     /// <summary>
     /// Required designer variable.
@@ -33,8 +33,8 @@ partial class ErrorForm
     {
         this.components = new System.ComponentModel.Container();
         this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-        this.ClientSize = new System.Drawing.Size(600, 450);
-        this.Text = "ErrorForm";
+        this.ClientSize = new System.Drawing.Size(800, 450);
+        this.Text = "ChooseNameForm";
     }
 
     #endregion

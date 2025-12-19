@@ -1,7 +1,7 @@
 ﻿using Google.Protobuf.Collections;
 using Snakes;
 
-namespace Snake.Game;
+namespace Snake.Game.SnakePackage;
  
 using Field;
 using Config;
@@ -43,6 +43,10 @@ public class SnakesGame
         {
             _lastId = Math.Max(_lastId, player.Id);
         }
+        foreach (var snake in _game.Snakes)
+        {
+            _lastId = Math.Max(_lastId, snake.PlayerId);
+        }
 
         _lastId++;
     }
@@ -52,7 +56,7 @@ public class SnakesGame
         return _game;
     }
 
-    public String GetName()
+    public string GetName()
     {
         return _name;
     }
@@ -69,7 +73,7 @@ public class SnakesGame
     private GameState.Types.Coord GetNextPointHeadSnake(GameState.Types.Snake snake)
     {
         var pointHead = snake.Points.First();
-        GameState.Types.Coord newPointHead = new(pointHead);
+        GameState.Types.Coord newPointHead = new GameState.Types.Coord(pointHead);
         switch (snake.HeadDirection)
         {
             case Direction.Up:
@@ -123,17 +127,16 @@ public class SnakesGame
         var pointHead = snake.Points.First();
         
         var pointTail = new GameState.Types.Coord(pointHead);
-        foreach (var point in snake.Points)
+
+        for (var i = 1; i < snake.Points.Count; i++)
         {
-            if (point.Equals(pointHead))
-            {
-                continue;
-            }
+            var point = snake.Points[i];
             pointTail.X = (pointTail.X + point.X + sizeStruct.X) % sizeStruct.X;
             pointTail.Y = (pointTail.Y + point.Y + sizeStruct.Y) % sizeStruct.Y;
         }
         
         var newPointHead = GetNextPointHeadSnake(snake);
+        
         tempField[(newPointHead.Y + sizeStruct.Y) % sizeStruct.Y * sizeStruct.X + (newPointHead.X + sizeStruct.X) % sizeStruct.X].Add(new Cell(newPointHead, CellType.SnakeHead, snake.PlayerId));
         snake.Points.Insert(0, newPointHead);
         snake.Points[1] = new GameState.Types.Coord
@@ -161,16 +164,17 @@ public class SnakesGame
         {
             if (player.Id == id)
             {
-                // _game.Players.Players.Remove(player);
+                diedPlayers.Add(new GamePlayer(player));
                 player.Role = NodeRole.Viewer;
-                diedPlayers.Add(player);
                 break;
             }
         }
 
         var random = new Random();
-        // var list = new List<GameState.Types.Coord>();
         var list = new RepeatedField<GameState.Types.Coord>();
+
+        var snakeDel = new GameState.Types.Snake();
+        var flag = false;
         
         foreach (var snake in _game.Snakes)
         {
@@ -190,15 +194,21 @@ public class SnakesGame
                         list.Add(new GameState.Types.Coord(snakePoint));
                     }
                 }
-                
-                _game.Snakes.Remove(snake);
+
+                snakeDel = snake;
+                flag = true;
                 break;
             }
         }
+
+        if (flag)
+        {
+            _game.Snakes.Remove(snakeDel);
+        }
         return list;
     }
-    
-    public List<GamePlayer> Tick()
+
+    private List<Cell>[] CreateTempField()
     {
         var sizeStruct = _field.GetSize();
         var size = sizeStruct.X * sizeStruct.Y;
@@ -213,6 +223,39 @@ public class SnakesGame
             }
             tempField[i] = [cell];
         }
+        return tempField;
+    }
+
+    private (int, int) CountSnakeInCell(List<Cell> cells)
+    {
+        
+        var countSnakeInCell = 0;
+        var countSnakeBodyInCell = 0;
+        
+        foreach (var cell in cells)
+        {
+            if (cell.Type is CellType.SnakeHead or CellType.SnakeBody)
+            {
+                countSnakeInCell++;
+            }
+
+            if (cell.Type is CellType.SnakeBody)
+            {
+                countSnakeBodyInCell++;
+            }
+
+            if (cell.Type is CellType.Empty)
+            {
+                countSnakeInCell -= countSnakeBodyInCell;
+                countSnakeBodyInCell = 0;
+            }
+        }
+        return (countSnakeInCell, countSnakeBodyInCell);
+    }
+    
+    public List<GamePlayer> Tick()
+    {
+        var tempField = CreateTempField();
 
         foreach (var snake in _game.Snakes)
         {
@@ -229,25 +272,8 @@ public class SnakesGame
             
             var countSnakeInCell = 0;
             var countSnakeBodyInCell = 0;
-
-            foreach (var cell in cells)
-            {
-                if (cell.Type is CellType.SnakeHead or CellType.SnakeBody)
-                {
-                    countSnakeInCell++;
-                }
-
-                if (cell.Type is CellType.SnakeBody)
-                {
-                    countSnakeBodyInCell++;
-                }
-
-                if (cell.Type is CellType.Empty)
-                {
-                    countSnakeInCell -= countSnakeBodyInCell;
-                    countSnakeBodyInCell = 0;
-                }
-            }
+            
+            (countSnakeInCell, countSnakeBodyInCell) = CountSnakeInCell(cells);
 
             if (countSnakeInCell > 1)
             {
@@ -264,16 +290,18 @@ public class SnakesGame
                             if (player.Id == cell.IdSnake)
                             {
                                 player.Score += countSnakeInCell - countSnakeBodyInCell;
+                                break;
                             }
                         }
                     }
                 }
             }
         }
-        UpdateGameState(_game);
-        var listNewFoods = _field.GenerateFood(Math.Max(AppConstant.StaticFood + _game.Snakes.Count - _game.Foods.Count, 0));
+
+        var listNewFoods = _field.GenerateFood(Math.Max(AppConstant.StaticFood + _game.Snakes.Select(snake => snake.State == GameState.Types.Snake.Types.SnakeState.Alive).Count() - _game.Foods.Count, 0));
         _game.Foods.AddRange(listNewFoods);
-        
+        UpdateGameState(_game);
+
         _game.StateOrder++;
         return diedPlayers;
     }
@@ -312,18 +340,27 @@ public class SnakesGame
             _game.Players.Players.Add(player);
             return;
         }
-        var coordinate = _field.FindEmptySquad();
-        if (coordinate != null)
+
+        while (true)
         {
-            player.Id = _lastId++;
-            _game.Players.Players.Add(player);
-            var snake = GenerateSnake(coordinate, player.Id);
-            snake.PlayerId = player.Id;
-            _game.Snakes.Add(snake);
-            _field.AddSnake(snake);
-        }
-        else
-        {
+            var coordinate = _field.FindEmptySquad();
+            if (coordinate != null)
+            {
+                player.Id = _lastId++;
+                _game.Players.Players.Add(player);
+                try
+                {
+                    var snake = GenerateSnake(coordinate, player.Id);
+                    snake.PlayerId = player.Id;
+                    _game.Snakes.Add(snake);
+                    _field.AddSnake(snake);
+                    break;
+                }
+                catch
+                {
+                    continue;
+                }
+            }
             throw new FieldAccessException();
         }
     }
@@ -336,8 +373,9 @@ public class SnakesGame
             Y = (coordinatesSquad.Y + 2) % _field.GetSize().Y
         };
         
-        Random random = new();
+        var random = new Random();
         var direction = (Direction) random.Next(1, 4);
+        var directionSafe = direction;
         var snake = new GameState.Types.Snake
         {
             HeadDirection = direction,
@@ -351,13 +389,35 @@ public class SnakesGame
             X = 0,
             Y = 0
         };
-        switch (direction)
+
+        while (true)
         {
-            case Direction.Up: coordinatesTail.Y = 1; break;
-            case Direction.Down: coordinatesTail.Y = -1; break;
-            case Direction.Left: coordinatesTail.X = 1; break;
-            case Direction.Right: coordinatesTail.X = -1; break;
+            coordinatesTail.X = 0;
+            coordinatesTail.Y = 0;
+            switch (direction)
+            {
+                case Direction.Up: coordinatesTail.Y = 1; break;
+                case Direction.Down: coordinatesTail.Y = -1; break;
+                case Direction.Left: coordinatesTail.X = 1; break;
+                case Direction.Right: coordinatesTail.X = -1; break;
+            }
+
+            var point = new GameState.Types.Coord
+            {
+                X = (coordinatesTail.X + coordinatesHead.X + _field.GetSize().X) % _field.GetSize().X,
+                Y = (coordinatesTail.Y + coordinatesHead.Y + _field.GetSize().Y) % _field.GetSize().Y
+            };
+            if (_field.GetCellType(point) == CellType.Empty)
+            {
+                break;
+            }
+            direction = (Direction) (((int) direction + 1) % 4);
+            if (directionSafe == direction)
+            {
+                throw new FieldAccessException();
+            }
         }
+        
         snake.Points.Add(coordinatesTail);
         return snake;
     }
