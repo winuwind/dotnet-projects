@@ -1,0 +1,45 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <OutputType>WinExe</OutputType>
+        <TargetFramework>net9.0-windows</TargetFramework>
+        <Nullable>enable</Nullable>
+        <UseWindowsForms>true</UseWindowsForms>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <RootNamespace>Snake</RootNamespace>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <PackageReference Include="Google.Protobuf" Version="3.33.1" />
+        <PackageReference Include="Grpc.Tools" Version="2.76.0">
+            <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+            <PrivateAssets>all</PrivateAssets>
+        </PackageReference>
+        <PackageReference Include="Serilog" Version="4.3.0" />
+        <PackageReference Include="Serilog.Sinks.Console" Version="6.1.1" />
+        <PackageReference Include="Serilog.Sinks.File" Version="7.0.0" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <Folder Include="Generated\" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <Compile Update="GUI\MainForm.cs">
+        <SubType>Form</SubType>
+      </Compile>
+      <Compile Update="GUI\ChooseRoleForm.cs">
+        <SubType>Form</SubType>
+      </Compile>
+      <Compile Update="GUI\ChooseValueForm.cs">
+        <SubType>Form</SubType>
+      </Compile>
+      <Compile Update="GUI\GameOverForm.cs">
+        <SubType>Form</SubType>
+      </Compile>
+      <Compile Update="GUI\ErrorForm.cs">
+        <SubType>Form</SubType>
+      </Compile>
+    </ItemGroup>
+
+</Project>
