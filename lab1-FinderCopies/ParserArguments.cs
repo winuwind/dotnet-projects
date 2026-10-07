@@ -57,7 +57,6 @@ public class ParserArguments
                 }
             }
         }
-        
         return (ip, port);
     }
 }
